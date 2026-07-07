@@ -1,0 +1,255 @@
+/* MyTempestStation - conservative CSS for iOS 10.3.3 Safari.
+   No CSS grid, no flex "gap", no custom properties, no clamp() -
+   spacing is done with margins/padding for maximum compatibility. */
+
+* {
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background-color: #0d1b2a;
+  background-image: -webkit-linear-gradient(top, #14263a 0%, #0a1420 100%);
+  background-image: linear-gradient(to bottom, #14263a 0%, #0a1420 100%);
+  color: #eaf1f8;
+  min-height: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+.screen {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* ---------- Setup screen ---------- */
+
+.setup-box {
+  margin-top: 48px;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 14px;
+  padding: 22px 20px;
+}
+
+.setup-box h1 {
+  margin: 0 0 6px 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.setup-lead {
+  margin: 0 0 18px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #a9bdd1;
+}
+
+.field-label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8ea6bd;
+  margin-bottom: 6px;
+}
+
+.token-input {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px; /* 16px avoids iOS zoom-on-focus */
+  color: #eaf1f8;
+  background-color: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  margin-bottom: 14px;
+  -webkit-appearance: none;
+}
+
+.token-input:focus {
+  outline: none;
+  border-color: #3aa0ff;
+}
+
+.setup-error {
+  margin: 12px 0 0 0;
+  color: #ff8a8a;
+  font-size: 14px;
+}
+
+.setup-help {
+  margin: 16px 0 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #7f96ac;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-block;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 18px;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.btn-primary {
+  width: 100%;
+  color: #ffffff;
+  background-color: #1f7ae0;
+}
+
+.btn-primary:active {
+  background-color: #1a68c0;
+}
+
+.btn-ghost {
+  color: #cfe0f2;
+  background-color: rgba(255, 255, 255, 0.08);
+  padding: 9px 14px;
+  font-size: 14px;
+}
+
+.btn-ghost:active {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.linkbtn {
+  background: none;
+  border: none;
+  color: #6fb2ff;
+  font-size: 13px;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* ---------- Dashboard header ---------- */
+
+.header {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-box-pack: justify;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.header-main {
+  min-width: 0;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.status-line {
+  margin-top: 3px;
+  font-size: 13px;
+  color: #8ea6bd;
+}
+
+.error-banner {
+  background-color: rgba(224, 74, 74, 0.15);
+  border: 1px solid rgba(224, 74, 74, 0.45);
+  color: #ffb3b3;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 16px;
+}
+
+/* ---------- Tiles (flex-wrap, margin-based gutters) ---------- */
+
+.tiles {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
+  margin: -6px; /* counteract tile margins for edge alignment */
+}
+
+.tile {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px;
+  margin: 6px;
+  width: 100%;
+}
+
+/* Two-up on wider phones/tablets. calc is supported on iOS 10. */
+@media (min-width: 420px) {
+  .tile {
+    width: -webkit-calc(50% - 12px);
+    width: calc(50% - 12px);
+  }
+  .tile-hero {
+    width: 100%;
+  }
+}
+
+.tile-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8ea6bd;
+  margin-bottom: 8px;
+}
+
+.tile-value {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.05;
+}
+
+.tile-value-hero {
+  font-size: 56px;
+}
+
+.tile-sub {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #a9bdd1;
+}
+
+/* ---------- Footer ---------- */
+
+.footer {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-box-pack: justify;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  color: #7f96ac;
+}
+
+.is-stale {
+  opacity: 0.5;
+}

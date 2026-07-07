@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>My Tempest Station</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Setup / token screen -->
+    <div id="setup" class="screen" style="display:none">
+      <div class="setup-box">
+        <h1>My Tempest Station</h1>
+        <p class="setup-lead">Enter your Tempest personal access token to connect this device. It is saved only on this device and never leaves your browser.</p>
+        <label for="token-input" class="field-label">Access token</label>
+        <input id="token-input" class="token-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="paste token here">
+        <button id="save-token" class="btn btn-primary" type="button">Connect</button>
+        <p id="setup-error" class="setup-error" style="display:none"></p>
+        <p class="setup-help">Create a token at tempestwx.com &rarr; Settings &rarr; Data Authorizations &rarr; Create Token.</p>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="screen" style="display:none">
+      <header class="header">
+        <div class="header-main">
+          <h1 id="station-name">My Tempest Station</h1>
+          <div id="status-line" class="status-line">Loading&hellip;</div>
+        </div>
+        <button id="refresh-btn" class="btn btn-ghost" type="button">Refresh</button>
+      </header>
+
+      <div id="error-banner" class="error-banner" style="display:none"></div>
+
+      <div id="tiles" class="tiles">
+        <div class="tile tile-hero">
+          <div class="tile-label">Temperature</div>
+          <div id="v-temp" class="tile-value tile-value-hero">&mdash;</div>
+          <div class="tile-sub">Feels like <span id="v-feels">&mdash;</span></div>
+        </div>
+        <div class="tile">
+          <div class="tile-label">Humidity</div>
+          <div id="v-humidity" class="tile-value">&mdash;</div>
+        </div>
+        <div class="tile">
+          <div class="tile-label">Wind</div>
+          <div id="v-wind" class="tile-value">&mdash;</div>
+          <div class="tile-sub">Gust <span id="v-gust">&mdash;</span> &middot; <span id="v-winddir">&mdash;</span></div>
+        </div>
+        <div class="tile">
+          <div class="tile-label">Pressure</div>
+          <div id="v-pressure" class="tile-value">&mdash;</div>
+        </div>
+        <div class="tile">
+          <div class="tile-label">Rain today</div>
+          <div id="v-rain" class="tile-value">&mdash;</div>
+        </div>
+      </div>
+
+      <footer class="footer">
+        <span id="updated-line">&nbsp;</span>
+        <button id="settings-btn" class="linkbtn" type="button">Settings</button>
+      </footer>
+    </div>
+
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
