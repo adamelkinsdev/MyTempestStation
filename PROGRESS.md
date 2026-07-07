@@ -78,15 +78,21 @@ handling, 60s auto-refresh.
   map + `iconSvg(key, px)` (fallback → `cloudy`) in `app.js`; `renderConditions`
   shows the icon + `current_conditions.conditions` words on the right of the
   temperature hero. Reusable at any px for F8/F9.
+- **F8 ✅ Hourly forecast strip** — new full-width tile "Hourly · next 24h": a
+  horizontally-scrollable row (`renderHourlyStrip`), one cell per hour with hour
+  label + F7 icon (34px) + temp°F + precip%. Cells are fixed-width `inline-block`
+  with margins in an `overflow-x:auto` container (no `gap`). 0% precip is drawn
+  transparent to keep vertical rhythm without clutter.
 
 ## Remaining backlog (not yet built)
 
 Ordered; build one at a time, deploy + verify + push per checkpoint.
 See `SUGGESTED_FEATURES.md` for detailed specs, data fields, and approach per item.
 
-- **Icon/forecast wave** *(F8 is next up)*: ~~F7 SVG weather-icon set + conditions
-  hero~~ ✅ · F8 hourly forecast strip · F9 multi-day forecast. The `iconSvg(key, px)`
-  helper from F7 is the shared unlock — F8/F9 reuse it directly.
+- **Icon/forecast wave** *(F9 is next up)*: ~~F7 SVG weather-icon set + conditions
+  hero~~ ✅ · ~~F8 hourly forecast strip~~ ✅ · F9 multi-day forecast (row of days:
+  icon + hi/lo + precip%, from `forecast.daily[]`; reuses `iconSvg()`). This also
+  satisfies the owner's "daily forecast" interest — decided against adding NOAA.
 - **History wave (build the localStorage history layer once):** F10 history layer
   → F11 temperature sparkline · F12 pressure sparkline · F13 today's observed
   high/low · F14 wind rose.

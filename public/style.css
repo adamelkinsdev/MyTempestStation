@@ -658,6 +658,32 @@ body {
   color: #7f96ac;
 }
 
+/* F8 hourly strip — scrollable row of hour + icon + temp + precip% cells. */
+.fstrip {
+  margin-top: 8px;
+  white-space: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  font-size: 0; /* kill inline-block whitespace between cells */
+}
+.fcell {
+  display: inline-block;
+  vertical-align: top;
+  text-align: center;
+  width: 50px;
+  margin-right: 6px;
+}
+.fhour { font-size: 12px; color: #9fb3c8; margin-bottom: 2px; }
+.ficon { line-height: 0; }
+.ficon svg { display: inline-block; }
+.ftemp {
+  font-size: 16px;
+  font-weight: 600;
+  color: #eaf1f8;
+  margin-top: 2px;
+}
+.fprecip { font-size: 12px; margin-top: 1px; }
+
 /* ---------- Wide screens: iPad landscape (1024px) and portrait (768px) ----------
    The base layout tops out at 640px; on the iPad's wide view that wastes most of
    the screen. Here we widen the shell, go to 3 metric tiles per row, and keep the
@@ -684,6 +710,13 @@ body {
   /* Bump the conditions icon + words to read from across the room. */
   .hero-cond-icon svg { width: 80px; height: 80px; }
   .hero-cond-text { font-size: 21px; max-width: 150px; }
+
+  /* Roomier hourly cells + bigger icons on the wide wall view. */
+  .fcell { width: 62px; margin-right: 8px; }
+  .ficon svg { width: 42px; height: 42px; }
+  .fhour { font-size: 13px; }
+  .ftemp { font-size: 18px; }
+  .fprecip { font-size: 13px; }
 
   /* Slightly larger metric numbers read better from across the room. */
   .tile-value { font-size: 34px; }

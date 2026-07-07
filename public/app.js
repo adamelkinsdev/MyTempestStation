@@ -445,6 +445,36 @@
           : ('Low ' + Math.round(lo) + '&deg; &middot; High ' + Math.round(hi) + '&deg;');
       }
     }
+
+    renderHourlyStrip(hourly);
+  }
+
+  // F8: combined hourly strip — hour + weather icon + temp + precip% per cell,
+  // horizontally scrollable. Reuses the F7 iconSvg() set. Only our own icon
+  // constants and formatted numbers go into innerHTML (h.icon is used solely as
+  // an ICONS lookup key), so there's no dynamic-string injection here.
+  function renderHourlyStrip(hourly) {
+    var strip = byId('hourly-strip');
+    if (!strip || !hourly || !hourly.length) { return; }
+    var n = Math.min(24, hourly.length);
+    var cells = '';
+    for (var i = 0; i < n; i++) {
+      var h = hourly[i];
+      var lh = toNum(h.local_hour);
+      var lbl = lh === null ? '' : hourLabel(lh);
+      var tc = toNum(h.air_temperature);
+      var tf = tc === null ? null : Math.round(cToF(tc));
+      var pp = toNum(h.precip_probability); if (pp === null) { pp = 0; }
+      var showPp = pp >= 5;
+      cells += '<div class="fcell">' +
+        '<div class="fhour">' + lbl + '</div>' +
+        '<div class="ficon">' + iconSvg(h.icon ? String(h.icon) : '', 34) + '</div>' +
+        '<div class="ftemp">' + (tf === null ? '&mdash;' : tf + '&deg;') + '</div>' +
+        '<div class="fprecip" style="color:' + (showPp ? precipColor(pp) : 'transparent') + '">' +
+          (showPp ? Math.round(pp) + '%' : '0') + '</div>' +
+        '</div>';
+    }
+    strip.innerHTML = cells;
   }
 
   function hourLabelLong(lh) {
