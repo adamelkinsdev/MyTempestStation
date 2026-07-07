@@ -69,15 +69,16 @@ handling, 60s auto-refresh.
   position, re-checked each clock tick (`#app.theme-*` classes).
 - **F5 ✅ Plain-English summary line** — one synthesized sentence under the header
   (conditions + temp + comfort + wind + rain outlook).
+- **F6 ✅ Threshold alerts** — tiles glow orange when a metric crosses a limit
+  (lightning ≤ 10 mi recent, gust ≥ 25 mph, UV ≥ 6, temp ≤ 34°F); thresholds are
+  constants in `app.js`.
 
 ## Remaining backlog (not yet built)
 
 Ordered; build one at a time, deploy + verify + push per checkpoint.
+See `SUGGESTED_FEATURES.md` for detailed specs, data fields, and approach per item.
 
-- **F6 · Threshold alerts** *(next up)* — tiles glow when a metric crosses a
-  limit. Agreed defaults: lightning ≤ 10 mi, gust ≥ 25 mph, UV ≥ 6, temp ≤ 34°F.
-  *(Not started — no code yet.)*
-- **Icon/forecast wave:** F7 SVG weather-icon set + conditions hero (text+icon) ·
+- **Icon/forecast wave** *(F7 is next up)*: F7 SVG weather-icon set + conditions hero (text+icon) ·
   F8 hourly forecast strip · F9 multi-day forecast. (F7's hand-drawn SVG icon set
   is the key unlock and the main effort; no icon fonts/CDNs on old Safari.)
 - **History wave (build the localStorage history layer once):** F10 history layer
