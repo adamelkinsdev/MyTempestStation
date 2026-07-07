@@ -473,6 +473,76 @@
   }
 
   // Synthesize a one-line summary from the forecast's current conditions + outlook.
+  /* ---------- F7: weather icons (inline SVG, iOS10-safe) ---------- */
+  // Hand-drawn icon set for the better_forecast `icon` keys. One 64x64 grid, a
+  // few reused atoms, solid fills only — no gradients/filters/masks/<use>/
+  // transforms — so old WebKit renders them reliably. Sun/moon are concatenated
+  // BEFORE the cloud so paint order masks the "peek"; do not reorder the atoms.
+  var IC_CLOUD = '<path fill="#eaf1f8" d="M18 45 A8.1 8.1 0 0 1 18 29 A13.2 13.2 0 0 1 44 29 A8.1 8.1 0 0 1 44 45 Z"/>';
+  var IC_CLOUD_HI = '<path fill="#eaf1f8" d="M18 39 A8.1 8.1 0 0 1 18 23 A13.2 13.2 0 0 1 44 23 A8.1 8.1 0 0 1 44 39 Z"/>';
+  var IC_BACKCLOUD = '<path fill="#9fb3c8" d="M30 27 A6.4 6.4 0 0 1 30 14.6 A10.4 10.4 0 0 1 50.3 14.6 A6.4 6.4 0 0 1 50.3 27 Z"/>';
+  var IC_MOON = '<path fill="#cfe2ff" d="M44 20 A15 15 0 1 0 44 44 A12.2 12.2 0 0 1 44 20 Z"/>';
+  var IC_MOON_A = '<path fill="#cfe2ff" d="M29.6 10.6 A9.3 9.3 0 1 0 29.6 25.4 A7.6 7.6 0 0 1 29.6 10.6 Z"/>';
+  var IC_MOON_B = '<path fill="#cfe2ff" d="M24.6 7.6 A9.3 9.3 0 1 0 24.6 22.4 A7.6 7.6 0 0 1 24.6 7.6 Z"/>';
+  var IC_SUN = '<circle cx="32" cy="32" r="13" fill="#ffd23f"/><path d="M32 14 L32 8 M44.5 19.5 L49 15 M50 32 L56 32 M44.5 44.5 L49 49 M32 50 L32 56 M19.5 44.5 L15 49 M14 32 L8 32 M19.5 19.5 L15 15" fill="none" stroke="#ffd23f" stroke-width="4.5" stroke-linecap="round"/>';
+  var IC_SUN_A = '<circle cx="23" cy="19" r="7" fill="#ffd23f"/><path d="M23 9 L23 5.5 M30 12 L32.5 9.5 M33 19 L36.5 19 M30 26 L32.5 28.5 M23 29 L23 32.5 M16 26 L13.5 28.5 M13 19 L9.5 19 M16 12 L13.5 9.5" fill="none" stroke="#ffd23f" stroke-width="3.5" stroke-linecap="round"/>';
+  var IC_SUN_B = '<circle cx="20" cy="16" r="7" fill="#ffd23f"/><path d="M20 6 L20 2.5 M27 9 L29.5 6.5 M30 16 L33.5 16 M27 23 L29.5 25.5 M20 26 L20 29.5 M13 23 L10.5 25.5 M10 16 L6.5 16 M13 9 L10.5 6.5" fill="none" stroke="#ffd23f" stroke-width="3.5" stroke-linecap="round"/>';
+  var IC_STARS = '<circle cx="51" cy="15" r="2.2" fill="#eaf1f8"/><circle cx="14" cy="49" r="1.8" fill="#eaf1f8"/>';
+  var IC_RAIN3 = '<path d="M23 43 L20 53 M33 43 L30 53 M43 43 L40 53" fill="none" stroke="#6fb2ff" stroke-width="4" stroke-linecap="round"/>';
+  var IC_RAIN2 = '<path d="M27 43 L24 52 M39 43 L36 52" fill="none" stroke="#6fb2ff" stroke-width="4" stroke-linecap="round"/>';
+  var IC_SNOW3 = '<path d="M21 43 L21 51 M17.5 45 L24.5 49 M17.5 49 L24.5 45 M32 49 L32 57 M28.5 51 L35.5 55 M28.5 55 L35.5 51 M43 43 L43 51 M39.5 45 L46.5 49 M39.5 49 L46.5 45" fill="none" stroke="#eaf1f8" stroke-width="2.5" stroke-linecap="round"/>';
+  var IC_SNOW2 = '<path d="M26 44 L26 52 M22.5 46 L29.5 50 M22.5 50 L29.5 46 M38 44 L38 52 M34.5 46 L41.5 50 M34.5 50 L41.5 46" fill="none" stroke="#eaf1f8" stroke-width="2.5" stroke-linecap="round"/>';
+  var IC_SLEET_F = '<path d="M22 43 L19 53 M42 43 L39 53 M32 47 L32 55 M28.5 49 L35.5 53 M28.5 53 L35.5 49" fill="none" stroke="#6fb2ff" stroke-width="3.5" stroke-linecap="round"/>';
+  var IC_SLEET_L = '<path d="M25 43 L22 52 M38 45 L38 53 M34.5 47 L41.5 51 M34.5 51 L41.5 47" fill="none" stroke="#6fb2ff" stroke-width="3.5" stroke-linecap="round"/>';
+  var IC_BOLT = '<polygon points="35,35 24,47 31,47 28,57 41,44 33,44" fill="#ffd23f"/>';
+  var IC_TSTREAK = '<path d="M17 42 L14 50 M47 42 L44 50" fill="none" stroke="#6fb2ff" stroke-width="4" stroke-linecap="round"/>';
+  var IC_FOG = '<path d="M12 46 L50 46 M20 54 L46 54" fill="none" stroke="#9fb3c8" stroke-width="4.5" stroke-linecap="round"/>';
+  var IC_WIND = '<path d="M8 25 L38 25 C45 25 46 15 39 15 M8 35 L46 35 C54 35 55 45 47 45" fill="none" stroke="#eaf1f8" stroke-width="4.5" stroke-linecap="round"/><path d="M10 45 L26 45" fill="none" stroke="#9fb3c8" stroke-width="4.5" stroke-linecap="round"/>';
+
+  var ICONS = {
+    'clear-day': IC_SUN,
+    'clear-night': IC_MOON + IC_STARS,
+    'cloudy': IC_BACKCLOUD + IC_CLOUD,
+    'foggy': IC_CLOUD_HI + IC_FOG,
+    'partly-cloudy-day': IC_SUN_A + IC_CLOUD,
+    'partly-cloudy-night': IC_MOON_A + IC_CLOUD,
+    'possibly-rainy-day': IC_SUN_B + IC_CLOUD_HI + IC_RAIN2,
+    'possibly-rainy-night': IC_MOON_B + IC_CLOUD_HI + IC_RAIN2,
+    'possibly-sleet-day': IC_SUN_B + IC_CLOUD_HI + IC_SLEET_L,
+    'possibly-sleet-night': IC_MOON_B + IC_CLOUD_HI + IC_SLEET_L,
+    'possibly-snow-day': IC_SUN_B + IC_CLOUD_HI + IC_SNOW2,
+    'possibly-snow-night': IC_MOON_B + IC_CLOUD_HI + IC_SNOW2,
+    'possibly-thunderstorm-day': IC_SUN_B + IC_CLOUD_HI + IC_BOLT,
+    'possibly-thunderstorm-night': IC_MOON_B + IC_CLOUD_HI + IC_BOLT,
+    'rainy': IC_CLOUD_HI + IC_RAIN3,
+    'sleet': IC_CLOUD_HI + IC_SLEET_F,
+    'snow': IC_CLOUD_HI + IC_SNOW3,
+    'thunderstorm': IC_CLOUD_HI + IC_BOLT + IC_TSTREAK,
+    'windy': IC_WIND
+  };
+
+  // Return a self-contained <svg> string for an icon key. Unknown/missing keys
+  // fall back to 'cloudy' — neutral, asserts no sun/moon or precipitation.
+  // Explicit width/height on the <svg> keeps old Safari from mis-sizing it.
+  function iconSvg(key, px) {
+    var inner = ICONS[key];
+    if (!inner) { inner = ICONS.cloudy; }
+    var size = px || 64;
+    return '<svg viewBox="0 0 64 64" width="' + size + '" height="' + size + '">' + inner + '</svg>';
+  }
+
+  // Current-conditions hero: icon + words on the right of the temperature tile.
+  function renderConditions(cc) {
+    var wrap = byId('hero-cond');
+    var iconEl = byId('cond-icon');
+    var textEl = byId('cond-text');
+    if (!wrap || !iconEl || !textEl) { return; }
+    if (!cc) { wrap.style.display = 'none'; return; }
+    iconEl.innerHTML = iconSvg(cc.icon ? String(cc.icon) : '', 64);
+    textEl.innerHTML = cc.conditions ? String(cc.conditions) : '&nbsp;';
+    wrap.style.display = '';
+  }
+
   function renderSummary(data) {
     var el = byId('summary');
     if (!el) { return; }
@@ -506,6 +576,7 @@
   function renderForecast(data) {
     if (!data) { return; }
     renderSummary(data);
+    renderConditions(data.current_conditions);
     if (!data.forecast) { return; }
     if (data.forecast.daily && data.forecast.daily.length) {
       renderSunArc(data.forecast.daily[0]);

@@ -72,15 +72,21 @@ handling, 60s auto-refresh.
 - **F6 ✅ Threshold alerts** — tiles glow orange when a metric crosses a limit
   (lightning ≤ 10 mi recent, gust ≥ 25 mph, UV ≥ 6, temp ≤ 34°F); thresholds are
   constants in `app.js`.
+- **F7 ✅ Weather-icon set + conditions hero** — hand-drawn inline-SVG icon for
+  each of the 19 Tempest `icon` keys (one 64×64 grid, reused atoms, solid fills
+  only — no gradients/filters/masks/`<use>`/transforms, iOS-10-safe). `ICONS`
+  map + `iconSvg(key, px)` (fallback → `cloudy`) in `app.js`; `renderConditions`
+  shows the icon + `current_conditions.conditions` words on the right of the
+  temperature hero. Reusable at any px for F8/F9.
 
 ## Remaining backlog (not yet built)
 
 Ordered; build one at a time, deploy + verify + push per checkpoint.
 See `SUGGESTED_FEATURES.md` for detailed specs, data fields, and approach per item.
 
-- **Icon/forecast wave** *(F7 is next up)*: F7 SVG weather-icon set + conditions hero (text+icon) ·
-  F8 hourly forecast strip · F9 multi-day forecast. (F7's hand-drawn SVG icon set
-  is the key unlock and the main effort; no icon fonts/CDNs on old Safari.)
+- **Icon/forecast wave** *(F8 is next up)*: ~~F7 SVG weather-icon set + conditions
+  hero~~ ✅ · F8 hourly forecast strip · F9 multi-day forecast. The `iconSvg(key, px)`
+  helper from F7 is the shared unlock — F8/F9 reuse it directly.
 - **History wave (build the localStorage history layer once):** F10 history layer
   → F11 temperature sparkline · F12 pressure sparkline · F13 today's observed
   high/low · F14 wind rose.

@@ -321,6 +321,30 @@ body {
 }
 .hero-meta .tile-label { margin-bottom: 3px; }
 
+/* F7 current-conditions: icon + words pushed to the right of the temp tile. */
+.hero-cond {
+  margin-left: auto;
+  padding-left: 14px;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  align-items: center;
+}
+.hero-cond-icon {
+  display: inline-block;
+  margin-right: 10px;
+}
+.hero-cond-icon svg { display: block; }
+.hero-cond-text {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: #dce8f4;
+  max-width: 110px;
+}
+
 .tile-sub {
   margin-top: 8px;
   font-size: 13px;
@@ -656,6 +680,10 @@ body {
 
   /* A little more presence for the headline temperature on the big screen. */
   .hero-temp { font-size: 60px; }
+
+  /* Bump the conditions icon + words to read from across the room. */
+  .hero-cond-icon svg { width: 80px; height: 80px; }
+  .hero-cond-text { font-size: 21px; max-width: 150px; }
 
   /* Slightly larger metric numbers read better from across the room. */
   .tile-value { font-size: 34px; }
