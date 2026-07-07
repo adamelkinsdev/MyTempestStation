@@ -194,6 +194,25 @@
     byId('rainbar-yest-val').innerHTML = yestIn === null ? '&mdash;' : yestIn.toFixed(2) + '"';
   }
 
+  /* ---------- Dew-point comfort ---------- */
+
+  // Comfort is driven by dew point (F), the metric people actually feel.
+  function renderComfort(dewC) {
+    var el = byId('v-comfort');
+    if (!el) { return; }
+    var d = toNum(dewC);
+    if (d === null) { el.innerHTML = '&mdash;'; return; }
+    var f = cToF(d);
+    var word, cls;
+    if (f < 55) { word = 'Dry'; cls = 'comfort-good'; }
+    else if (f < 60) { word = 'Comfortable'; cls = 'comfort-good'; }
+    else if (f < 65) { word = 'Sticky'; cls = 'comfort-mid'; }
+    else if (f < 70) { word = 'Muggy'; cls = 'comfort-mid'; }
+    else if (f < 75) { word = 'Oppressive'; cls = 'comfort-bad'; }
+    else { word = 'Sweltering'; cls = 'comfort-bad'; }
+    el.innerHTML = '<span class="' + cls + '">' + word + '</span>';
+  }
+
   /* ---------- UV index (WHO color bands) ---------- */
 
   function uvCategory(uv) {
@@ -423,6 +442,8 @@
     byId('v-temp').innerHTML = fmt(o.air_temperature, cToF, 0, '&deg;');
     byId('v-feels').innerHTML = fmt(o.feels_like, cToF, 0, '&deg;');
     byId('v-humidity').innerHTML = fmt(o.relative_humidity, null, 0, '%');
+    byId('v-dewpoint').innerHTML = fmt(o.dew_point, cToF, 0, '&deg;');
+    renderComfort(o.dew_point);
     byId('v-wind').innerHTML = fmt(o.wind_avg, mpsToMph, 1, ' mph');
     byId('v-gust').innerHTML = fmt(o.wind_gust, mpsToMph, 1, ' mph');
 

@@ -292,6 +292,10 @@ body {
 
 /* ---------- Pressure trend ---------- */
 
+.comfort-good { color: #7fdca0; font-weight: 600; }
+.comfort-mid { color: #f2d648; font-weight: 600; }
+.comfort-bad { color: #ff9e6b; font-weight: 600; }
+
 .trend-up { color: #7fdca0; font-weight: 600; }
 .trend-down { color: #ff9e6b; font-weight: 600; }
 .trend-flat { color: #9fb3c8; font-weight: 600; }
