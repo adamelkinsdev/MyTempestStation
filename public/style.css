@@ -188,6 +188,35 @@ body {
   color: #8ea6bd;
 }
 
+/* Header clock: hidden on narrow phones, shown from tablet width up. */
+.header-clock {
+  display: none;
+  text-align: center;
+  -webkit-box-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+}
+.clock-time {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.05;
+}
+.clock-date {
+  font-size: 12px;
+  color: #8ea6bd;
+}
+
+@media (min-width: 560px) {
+  .header-clock {
+    display: block;
+  }
+}
+
+@media (min-width: 760px) {
+  .clock-time { font-size: 28px; }
+  .clock-date { font-size: 13px; }
+}
+
 .error-banner {
   background-color: rgba(224, 74, 74, 0.15);
   border: 1px solid rgba(224, 74, 74, 0.45);

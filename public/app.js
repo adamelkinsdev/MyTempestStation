@@ -422,6 +422,19 @@
 
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
+  /* ---------- Header clock ---------- */
+
+  var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function updateClock() {
+    var d = new Date();
+    var t = byId('clock-time');
+    var dt = byId('clock-date');
+    if (t) { t.innerHTML = formatTime(d.getTime() / 1000); }
+    if (dt) { dt.innerHTML = DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate(); }
+  }
+
   function formatTime(epochSeconds) {
     var d = new Date(Number(epochSeconds) * 1000);
     var h = d.getHours();
@@ -673,6 +686,10 @@
     byId('refresh-btn').onclick = refreshAll;
     byId('watch-btn').onclick = toggleWatch;
     byId('settings-btn').onclick = onSettings;
+
+    // Header clock: set now, then tick (minutes only, so 15s is plenty).
+    updateClock();
+    setInterval(updateClock, 15000);
 
     // Enter key in either setup field submits.
     function submitOnEnter(e) {
