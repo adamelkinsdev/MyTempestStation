@@ -526,3 +526,41 @@ body {
   font-size: 10px;
   color: #7f96ac;
 }
+
+/* ---------- Wide screens: iPad landscape (1024px) and portrait (768px) ----------
+   The base layout tops out at 640px; on the iPad's wide view that wastes most of
+   the screen. Here we widen the shell, go to 3 metric tiles per row, and keep the
+   full-width forecast tiles + sun arc from stretching awkwardly. */
+@media (min-width: 760px) {
+  .screen {
+    max-width: 1000px;
+    padding: 22px;
+  }
+
+  /* 3 metric tiles per row; hero + forecast strips still span the full width. */
+  .tile {
+    width: -webkit-calc(33.333% - 12px);
+    width: calc(33.333% - 12px);
+  }
+  .tile-hero,
+  .tile-full {
+    width: 100%;
+  }
+
+  /* A little more presence for the headline temperature on the big screen. */
+  .tile-value-hero { font-size: 72px; }
+
+  /* Slightly larger metric numbers read better from across the room. */
+  .tile-value { font-size: 34px; }
+
+  /* Taller strips so they don't look like thin slivers on a wide tile. */
+  .heatseg { height: 26px; }
+  .hbar-area { height: 68px; }
+}
+
+/* Keep the sun arc a tidy centered widget rather than a huge full-width arc. */
+.sunarc {
+  max-width: 440px;
+  margin-left: auto;
+  margin-right: auto;
+}
