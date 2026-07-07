@@ -260,3 +260,135 @@ body {
 .trend-down { color: #ff9e6b; font-weight: 600; }
 .trend-flat { color: #9fb3c8; font-weight: 600; }
 .trend-arrow { font-size: 15px; }
+
+/* ---------- Shared bar bits ---------- */
+
+.bar-scale {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-pack: justify;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #7f96ac;
+}
+
+/* ---------- Wind speed bar ---------- */
+
+.windbar { margin-top: 12px; }
+
+.windbar-track {
+  position: relative;
+  height: 10px;
+  background-color: rgba(255, 255, 255, 0.10);
+  border-radius: 6px;
+  overflow: visible;
+}
+
+.windbar-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 6px;
+  background-color: #4aa3ff;
+}
+
+.wind-calm { background-color: #4aa3ff; }
+.wind-mod { background-color: #4ad0a0; }
+.wind-strong { background-color: #ff9e6b; }
+
+.windbar-mark {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 16px;
+  margin-left: -1px;
+  border-radius: 2px;
+}
+
+.windbar-gust { background-color: #ffffff; }
+.windbar-lull { background-color: rgba(255, 255, 255, 0.45); }
+
+/* ---------- Rain bars ---------- */
+
+.rainbars { margin-top: 12px; }
+
+.rainbar-row {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.rainbar-lbl {
+  width: 42px;
+  font-size: 12px;
+  color: #8ea6bd;
+}
+
+.rainbar-track {
+  -webkit-box-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+  height: 12px;
+  background-color: rgba(255, 255, 255, 0.10);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.rainbar-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 6px;
+  background-color: #4aa3ff;
+}
+
+.rainbar-fill-yest { background-color: #5b6b7e; }
+
+.rainbar-val {
+  width: 56px;
+  text-align: right;
+  font-size: 12px;
+  color: #cfe0f2;
+}
+
+/* ---------- UV bar ---------- */
+
+.uvbar { margin-top: 12px; }
+
+.uvbar-track {
+  position: relative;
+  height: 10px;
+  border-radius: 6px;
+  overflow: visible;
+  font-size: 0; /* kill inline-block whitespace between segments */
+}
+
+.uvseg {
+  display: inline-block;
+  height: 10px;
+  vertical-align: top;
+}
+
+.uvseg-low { width: 18.18%; background-color: #4ad06a; border-radius: 6px 0 0 6px; }
+.uvseg-mod { width: 27.27%; background-color: #f2d648; }
+.uvseg-high { width: 18.18%; background-color: #f59d3c; }
+.uvseg-vhigh { width: 27.27%; background-color: #e5593c; }
+.uvseg-extreme { width: 9.09%; background-color: #a56cd6; border-radius: 0 6px 6px 0; }
+
+.uvbar-marker {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 4px;
+  height: 16px;
+  margin-left: -2px;
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  border-radius: 2px;
+}

@@ -50,6 +50,14 @@
           <div class="tile-label">Wind</div>
           <div id="v-wind" class="tile-value">&mdash;</div>
           <div class="tile-sub">Gust <span id="v-gust">&mdash;</span> &middot; <span id="v-winddir">&mdash;</span></div>
+          <div class="windbar">
+            <div class="windbar-track">
+              <div id="windbar-fill" class="windbar-fill"></div>
+              <div id="windbar-lull" class="windbar-mark windbar-lull"></div>
+              <div id="windbar-gust" class="windbar-mark windbar-gust"></div>
+            </div>
+            <div class="bar-scale"><span>0</span><span>20 mph</span></div>
+          </div>
         </div>
         <div class="tile">
           <div class="tile-label">Pressure</div>
@@ -57,8 +65,33 @@
           <div class="tile-sub"><span id="v-pressure-trend">&nbsp;</span></div>
         </div>
         <div class="tile">
-          <div class="tile-label">Rain today</div>
+          <div class="tile-label">Rain</div>
           <div id="v-rain" class="tile-value">&mdash;</div>
+          <div class="tile-sub" id="v-rain-dur">&nbsp;</div>
+          <div class="rainbars">
+            <div class="rainbar-row">
+              <span class="rainbar-lbl">Today</span>
+              <span class="rainbar-track"><span id="rainbar-today" class="rainbar-fill"></span></span>
+              <span id="rainbar-today-val" class="rainbar-val">&mdash;</span>
+            </div>
+            <div class="rainbar-row">
+              <span class="rainbar-lbl">Yest</span>
+              <span class="rainbar-track"><span id="rainbar-yest" class="rainbar-fill rainbar-fill-yest"></span></span>
+              <span id="rainbar-yest-val" class="rainbar-val">&mdash;</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-label">UV Index</div>
+          <div id="v-uv" class="tile-value">&mdash;</div>
+          <div class="tile-sub" id="v-uv-cat">&nbsp;</div>
+          <div class="uvbar">
+            <div class="uvbar-track">
+              <span class="uvseg uvseg-low"></span><span class="uvseg uvseg-mod"></span><span class="uvseg uvseg-high"></span><span class="uvseg uvseg-vhigh"></span><span class="uvseg uvseg-extreme"></span>
+              <span id="uvbar-marker" class="uvbar-marker"></span>
+            </div>
+          </div>
         </div>
       </div>
 

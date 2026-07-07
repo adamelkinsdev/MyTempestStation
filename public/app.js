@@ -82,6 +82,112 @@
     return CARDINALS[idx];
   }
 
+  // Return a finite Number, or null for missing/invalid values.
+  function toNum(value) {
+    if (value === null || value === undefined || value === '') { return null; }
+    var n = Number(value);
+    return isNaN(n) ? null : n;
+  }
+
+  // m/s -> mph as a Number (null-safe), for the bars/gauges.
+  function mpsToMphN(value) {
+    var n = toNum(value);
+    return n === null ? null : mpsToMph(n);
+  }
+
+  // Clamp value/max to a 0-100 percentage.
+  function pct(value, max) {
+    if (value === null || !max) { return 0; }
+    var p = value / max * 100;
+    if (p < 0) { return 0; }
+    if (p > 100) { return 100; }
+    return p;
+  }
+
+  function fmtDuration(mins) {
+    var m = toNum(mins);
+    if (m === null) { return ''; }
+    m = Math.round(m);
+    if (m < 60) { return m + ' min'; }
+    var h = Math.floor(m / 60);
+    return h + 'h ' + pad2(m % 60) + 'm';
+  }
+
+  /* ---------- Wind speed bar (0-20 mph, gust + lull markers) ---------- */
+
+  function windClass(mph) {
+    if (mph === null) { return 'wind-calm'; }
+    if (mph < 5) { return 'wind-calm'; }
+    if (mph < 15) { return 'wind-mod'; }
+    return 'wind-strong';
+  }
+
+  function renderWindBar(avgMph, gustMph, lullMph) {
+    var max = 20;
+    var fill = byId('windbar-fill');
+    var gust = byId('windbar-gust');
+    var lull = byId('windbar-lull');
+    if (fill) {
+      fill.style.width = pct(avgMph, max) + '%';
+      fill.className = 'windbar-fill ' + windClass(avgMph);
+    }
+    if (gust) {
+      if (gustMph === null) { gust.style.display = 'none'; }
+      else { gust.style.display = ''; gust.style.left = pct(gustMph, max) + '%'; }
+    }
+    if (lull) {
+      // Only show the lull marker when it is meaningfully above zero.
+      if (lullMph === null || lullMph < 0.5) { lull.style.display = 'none'; }
+      else { lull.style.display = ''; lull.style.left = pct(lullMph, max) + '%'; }
+    }
+  }
+
+  /* ---------- Rain today vs. yesterday ---------- */
+
+  function rainText(inches) {
+    if (inches === null) { return '&mdash;'; }
+    if (inches > 0 && inches < 0.01) { return 'Trace'; }
+    return inches.toFixed(2) + ' in';
+  }
+
+  function renderRain(o) {
+    var todayMm = toNum(o.precip_accum_local_day);
+    var yestMm = toNum(o.precip_accum_local_yesterday);
+    var todayIn = todayMm === null ? null : mmToIn(todayMm);
+    var yestIn = yestMm === null ? null : mmToIn(yestMm);
+
+    byId('v-rain').innerHTML = rainText(todayIn);
+
+    var durToday = fmtDuration(o.precip_minutes_local_day);
+    byId('v-rain-dur').innerHTML = durToday ? ('Rained ' + durToday + ' today') : '&nbsp;';
+
+    // Scale both bars to the larger of the two (min floor avoids divide-by-zero).
+    var max = Math.max(todayIn || 0, yestIn || 0, 0.01);
+    byId('rainbar-today').style.width = pct(todayIn, max) + '%';
+    byId('rainbar-yest').style.width = pct(yestIn, max) + '%';
+    byId('rainbar-today-val').innerHTML = todayIn === null ? '&mdash;' : (todayIn > 0 && todayIn < 0.01 ? 'Trace' : todayIn.toFixed(2) + '"');
+    byId('rainbar-yest-val').innerHTML = yestIn === null ? '&mdash;' : yestIn.toFixed(2) + '"';
+  }
+
+  /* ---------- UV index (WHO color bands) ---------- */
+
+  function uvCategory(uv) {
+    if (uv === null) { return ''; }
+    if (uv < 3) { return 'Low'; }
+    if (uv < 6) { return 'Moderate'; }
+    if (uv < 8) { return 'High'; }
+    if (uv < 11) { return 'Very High'; }
+    return 'Extreme';
+  }
+
+  function renderUV(uvRaw) {
+    var uv = toNum(uvRaw);
+    byId('v-uv').innerHTML = uv === null ? '&mdash;' : uv.toFixed(1);
+    byId('v-uv-cat').innerHTML = uv === null ? '&nbsp;' : uvCategory(uv);
+    var marker = byId('uvbar-marker');
+    if (marker) { marker.style.left = pct(uv, 11) + '%'; }
+  }
+
   // Map the pressure_trend string ("rising"/"falling"/"steady") to a colored
   // arrow + label. Storm-watchers care about this more than the number itself.
   function renderPressureTrend(trend) {
@@ -134,6 +240,8 @@
       ? '' : (' ' + Math.round(Number(o.wind_direction)) + '&deg;');
     byId('v-winddir').innerHTML = card ? (card + deg) : (deg || '&mdash;');
 
+    renderWindBar(mpsToMphN(o.wind_avg), mpsToMphN(o.wind_gust), mpsToMphN(o.wind_lull));
+
     // Prefer sea-level pressure; fall back to station/barometric pressure.
     var pressure = (o.sea_level_pressure !== undefined && o.sea_level_pressure !== null)
       ? o.sea_level_pressure
@@ -141,7 +249,8 @@
     byId('v-pressure').innerHTML = fmt(pressure, mbToInHg, 2, ' inHg');
     renderPressureTrend(o.pressure_trend);
 
-    byId('v-rain').innerHTML = fmt(o.precip_accum_local_day, mmToIn, 2, ' in');
+    renderRain(o);
+    renderUV(o.uv);
 
     // timestamp / staleness
     var stamp = o.timestamp;
