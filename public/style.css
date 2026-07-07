@@ -451,3 +451,78 @@ body {
   line-height: 1.1;
   margin-bottom: 4px;
 }
+
+/* ---------- Full-width forecast tiles ---------- */
+
+@media (min-width: 420px) {
+  .tile-full { width: 100%; }
+}
+
+/* Sun arc */
+.sunarc { margin-top: 4px; }
+.sunarc-svg { display: block; width: 100%; height: auto; }
+.sunarc-labels {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-pack: justify;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #a9bdd1;
+}
+
+/* Precip probability strip */
+.hstrip {
+  margin-top: 8px;
+  font-size: 0; /* remove inline-block whitespace */
+  white-space: nowrap;
+}
+.hcell {
+  display: inline-block;
+  width: 8.33%;
+  text-align: center;
+  vertical-align: bottom;
+}
+.hbar-area {
+  position: relative;
+  height: 52px;
+}
+.hbar {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 0;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background-color: #4a9fd0;
+}
+.hval { font-size: 9px; color: #8ea6bd; margin-top: 3px; }
+.hlabel { font-size: 9px; color: #7f96ac; }
+
+/* Temperature heat-strip */
+.heatstrip {
+  margin-top: 8px;
+  font-size: 0;
+  white-space: nowrap;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.heatseg {
+  display: inline-block;
+  width: 4.16%;
+  height: 20px;
+  vertical-align: top;
+}
+.heatlabels {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-pack: justify;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #7f96ac;
+}

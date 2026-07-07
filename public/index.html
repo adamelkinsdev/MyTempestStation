@@ -137,6 +137,33 @@
             </div>
           </div>
         </div>
+
+        <div class="tile tile-full">
+          <div class="tile-label">Sun</div>
+          <div class="sunarc">
+            <svg viewBox="0 0 200 92" class="sunarc-svg" preserveAspectRatio="xMidYMid meet">
+              <line x1="20" y1="82" x2="180" y2="82" stroke="rgba(255,255,255,0.15)" stroke-width="1"></line>
+              <path d="M 28 82 A 72 72 0 0 1 172 82" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5" stroke-dasharray="3 3"></path>
+              <circle id="sun-dot" cx="28" cy="82" r="6" fill="#ffd23f" opacity="0"></circle>
+            </svg>
+            <div class="sunarc-labels">
+              <span>&#9728; <span id="sun-rise">&mdash;</span></span>
+              <span id="sun-set">&mdash;</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile tile-full">
+          <div class="tile-label">Rain chance &middot; next 12h</div>
+          <div id="precip-strip" class="hstrip"></div>
+        </div>
+
+        <div class="tile tile-full">
+          <div class="tile-label">Temperature &middot; next 24h</div>
+          <div id="heat-strip" class="heatstrip"></div>
+          <div id="heat-labels" class="heatlabels"></div>
+          <div id="heat-caption" class="tile-sub">&nbsp;</div>
+        </div>
       </div>
 
       <footer class="footer">

@@ -242,6 +242,118 @@
     }
   }
 
+  /* ---------- Forecast: sun arc, precip strip, heat strip ---------- */
+
+  function hourLabel(lh) {
+    var h = lh % 12;
+    if (h === 0) { h = 12; }
+    return h + (lh < 12 ? 'a' : 'p');
+  }
+
+  function precipColor(pp) {
+    if (pp < 20) { return '#3f6b8f'; }
+    if (pp < 50) { return '#4a9fd0'; }
+    if (pp < 75) { return '#3ec1ea'; }
+    return '#5ed0f5';
+  }
+
+  // Temperature (F) -> blue(cold)..red(hot) via HSL hue interpolation.
+  function tempColor(f) {
+    if (f === null) { return '#5b6b7e'; }
+    var c = f; if (c < 10) { c = 10; } if (c > 100) { c = 100; }
+    var hue = 220 - ((c - 10) / 90) * 220;
+    return 'hsl(' + Math.round(hue) + ', 68%, 52%)';
+  }
+
+  function renderSunArc(day) {
+    var sun = byId('sun-dot');
+    if (!day || !sun || !sun.setAttribute) { return; }
+    var sr = toNum(day.sunrise), ss = toNum(day.sunset);
+    if (sr === null || ss === null || ss <= sr) { return; }
+
+    var now = new Date().getTime() / 1000;
+    var t = (now - sr) / (ss - sr);
+    var night = (t < 0 || t > 1);
+    if (t < 0) { t = 0; } if (t > 1) { t = 1; }
+
+    // Point on the semicircle: center (100,82) r72, apex at top.
+    var th = (1 - t) * Math.PI;
+    sun.setAttribute('cx', (100 + 72 * Math.cos(th)).toFixed(1));
+    sun.setAttribute('cy', (82 - 72 * Math.sin(th)).toFixed(1));
+    sun.setAttribute('opacity', night ? '0.3' : '1');
+
+    byId('sun-rise').innerHTML = formatTime(sr);
+    byId('sun-set').innerHTML = formatTime(ss);
+  }
+
+  function renderHourly(hourly) {
+    if (!hourly || !hourly.length) { return; }
+
+    // Precip probability strip — next 12 hours.
+    var precip = byId('precip-strip');
+    if (precip) {
+      var pcells = '';
+      var pn = Math.min(12, hourly.length);
+      for (var i = 0; i < pn; i++) {
+        var h = hourly[i];
+        var pp = toNum(h.precip_probability); if (pp === null) { pp = 0; }
+        var lh = toNum(h.local_hour); var lbl = lh === null ? '' : hourLabel(lh);
+        pcells += '<div class="hcell">' +
+          '<div class="hbar-area"><div class="hbar" style="height:' + Math.max(2, pp) + '%;background-color:' + precipColor(pp) + '"></div></div>' +
+          '<div class="hval">' + Math.round(pp) + '</div>' +
+          '<div class="hlabel">' + lbl + '</div></div>';
+      }
+      precip.innerHTML = pcells;
+    }
+
+    // Temperature heat-strip — next 24 hours.
+    var heat = byId('heat-strip');
+    if (heat) {
+      var hn = Math.min(24, hourly.length);
+      var segs = '';
+      var lo = null, hi = null;
+      for (var j = 0; j < hn; j++) {
+        var tc = toNum(hourly[j].air_temperature);
+        var tf = tc === null ? null : cToF(tc);
+        if (tf !== null) {
+          if (lo === null || tf < lo) { lo = tf; }
+          if (hi === null || tf > hi) { hi = tf; }
+        }
+        segs += '<span class="heatseg" style="background-color:' + tempColor(tf) + '"></span>';
+      }
+      heat.innerHTML = segs;
+
+      // Sparse hour labels beneath the ribbon.
+      var labels = byId('heat-labels');
+      if (labels) {
+        var marks = [0, 6, 12, 18, hn - 1];
+        var lcells = '';
+        for (var k = 0; k < marks.length; k++) {
+          var idx = marks[k];
+          if (idx < hn) {
+            var mlh = toNum(hourly[idx].local_hour);
+            lcells += '<span>' + (mlh === null ? '' : hourLabel(mlh)) + '</span>';
+          }
+        }
+        labels.innerHTML = lcells;
+      }
+
+      var cap = byId('heat-caption');
+      if (cap) {
+        cap.innerHTML = (lo === null || hi === null) ? '&nbsp;'
+          : ('Low ' + Math.round(lo) + '&deg; &middot; High ' + Math.round(hi) + '&deg;');
+      }
+    }
+  }
+
+  function renderForecast(data) {
+    if (!data || !data.forecast) { return; }
+    if (data.forecast.daily && data.forecast.daily.length) {
+      renderSunArc(data.forecast.daily[0]);
+    }
+    renderHourly(data.forecast.hourly);
+  }
+
   // Map the pressure_trend string ("rising"/"falling"/"steady") to a colored
   // arrow + label. Storm-watchers care about this more than the number itself.
   function renderPressureTrend(trend) {
@@ -374,11 +486,40 @@
     xhr.send();
   }
 
+  function buildForecastUrl(token) {
+    return 'https://swd.weatherflow.com/swd/rest/better_forecast?station_id=' + STATION_ID +
+      '&token=' + encodeURIComponent(token);
+  }
+
+  // Forecast is secondary: on any failure we quietly leave the forecast tiles
+  // as-is rather than disturbing the primary observation display.
+  function fetchForecast() {
+    var token = getToken();
+    if (!token) { return; }
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', buildForecastUrl(token), true);
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4 || xhr.status !== 200) { return; }
+      var data = null;
+      try { data = JSON.parse(xhr.responseText); } catch (e) { return; }
+      renderForecast(data);
+    };
+    xhr.send();
+  }
+
+  // Fetch current conditions and forecast together.
+  function refreshAll() {
+    fetchData();
+    fetchForecast();
+  }
+
   /* ---------- auto refresh ---------- */
 
   function startAutoRefresh() {
     stopAutoRefresh();
-    refreshTimer = setInterval(fetchData, REFRESH_MS);
+    refreshTimer = setInterval(refreshAll, REFRESH_MS);
   }
   function stopAutoRefresh() {
     if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
@@ -396,7 +537,7 @@
     setToken(value);
     setError('');
     showDashboard();
-    fetchData();
+    refreshAll();
     startAutoRefresh();
   }
 
@@ -406,7 +547,7 @@
 
   function init() {
     byId('save-token').onclick = onSaveToken;
-    byId('refresh-btn').onclick = fetchData;
+    byId('refresh-btn').onclick = refreshAll;
     byId('settings-btn').onclick = onSettings;
 
     // Enter key in the token field submits.
@@ -418,13 +559,13 @@
     // Refresh when the app returns to foreground (iOS resumes from background).
     if (typeof document.addEventListener === 'function') {
       document.addEventListener('visibilitychange', function () {
-        if (!document.hidden && getToken()) { fetchData(); }
+        if (!document.hidden && getToken()) { refreshAll(); }
       }, false);
     }
 
     if (getToken()) {
       showDashboard();
-      fetchData();
+      refreshAll();
       startAutoRefresh();
     } else {
       showSetup('');
