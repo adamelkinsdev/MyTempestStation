@@ -1,12 +1,13 @@
 /* MyTempestStation dashboard.
  * Written in conservative ES5 (no arrow functions, template literals, let/const,
  * fetch, or Promises) so it runs on Safari for iOS 10.3.3.
- * The API token is stored only in this browser's localStorage - never in source. */
+ * The station ID and API token are stored only in this browser's localStorage -
+ * never in source, so nothing here reveals the station or its location. */
 (function () {
   'use strict';
 
-  var STATION_ID = '210198';
   var TOKEN_KEY = 'tempest_token';
+  var STATION_KEY = 'tempest_station';
   var REFRESH_MS = 60000; // auto-refresh every 60 seconds
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
@@ -14,7 +15,7 @@
 
   function byId(id) { return document.getElementById(id); }
 
-  /* ---------- token storage ---------- */
+  /* ---------- credential storage (token + station, per-device) ---------- */
 
   function getToken() {
     try { return localStorage.getItem(TOKEN_KEY); }
@@ -27,6 +28,19 @@
     try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
   }
 
+  function getStation() {
+    try { return localStorage.getItem(STATION_KEY); }
+    catch (e) { return null; }
+  }
+  function setStation(s) {
+    try { localStorage.setItem(STATION_KEY, s); } catch (e) {}
+  }
+
+  // True only when this device has both values configured.
+  function isConfigured() {
+    return !!(getToken() && getStation());
+  }
+
   /* ---------- screen switching ---------- */
 
   function showSetup(message) {
@@ -36,8 +50,8 @@
     var err = byId('setup-error');
     if (message) { err.innerHTML = message; err.style.display = ''; }
     else { err.style.display = 'none'; }
-    var input = byId('token-input');
-    input.value = getToken() || '';
+    byId('token-input').value = getToken() || '';
+    byId('station-input').value = getStation() || '';
   }
 
   function showDashboard() {
@@ -439,20 +453,21 @@
 
   /* ---------- data fetch ---------- */
 
-  function buildUrl(token) {
+  function buildUrl(token, station) {
     // The obs array is always metric; we convert to imperial in render().
-    return 'https://swd.weatherflow.com/swd/rest/observations/station/' + STATION_ID +
+    return 'https://swd.weatherflow.com/swd/rest/observations/station/' + encodeURIComponent(station) +
       '?token=' + encodeURIComponent(token);
   }
 
   function fetchData() {
     var token = getToken();
-    if (!token) { showSetup(); return; }
+    var station = getStation();
+    if (!token || !station) { showSetup(); return; }
 
     setStatus('Updating&hellip;');
 
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', buildUrl(token), true);
+    xhr.open('GET', buildUrl(token, station), true);
     xhr.timeout = 15000;
 
     xhr.onreadystatechange = function () {
@@ -468,7 +483,7 @@
         setError('Your token was rejected. Open Settings to re-enter it.');
       } else if (xhr.status === 404) {
         setStatus('Not found');
-        setError('Station ' + STATION_ID + ' was not found.');
+        setError('Station ' + station + ' was not found. Check the Station ID in Settings.');
       } else if (xhr.status === 0) {
         setStatus('Offline');
         setError('Network error &mdash; check your internet connection.');
@@ -486,8 +501,8 @@
     xhr.send();
   }
 
-  function buildForecastUrl(token) {
-    return 'https://swd.weatherflow.com/swd/rest/better_forecast?station_id=' + STATION_ID +
+  function buildForecastUrl(token, station) {
+    return 'https://swd.weatherflow.com/swd/rest/better_forecast?station_id=' + encodeURIComponent(station) +
       '&token=' + encodeURIComponent(token);
   }
 
@@ -495,10 +510,11 @@
   // as-is rather than disturbing the primary observation display.
   function fetchForecast() {
     var token = getToken();
-    if (!token) { return; }
+    var station = getStation();
+    if (!token || !station) { return; }
 
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', buildForecastUrl(token), true);
+    xhr.open('GET', buildForecastUrl(token, station), true);
     xhr.timeout = 15000;
     xhr.onreadystatechange = function () {
       if (xhr.readyState !== 4 || xhr.status !== 200) { return; }
@@ -527,14 +543,15 @@
 
   /* ---------- event wiring ---------- */
 
-  function onSaveToken() {
-    var input = byId('token-input');
-    var value = input.value ? input.value.replace(/^\s+|\s+$/g, '') : '';
-    if (!value) {
-      showSetup('Please paste a token first.');
-      return;
-    }
-    setToken(value);
+  function trim(s) { return s ? s.replace(/^\s+|\s+$/g, '') : ''; }
+
+  function onSaveSetup() {
+    var station = trim(byId('station-input').value);
+    var token = trim(byId('token-input').value);
+    if (!station) { showSetup('Please enter your Station ID.'); return; }
+    if (!token) { showSetup('Please paste your access token.'); return; }
+    setStation(station);
+    setToken(token);
     setError('');
     showDashboard();
     refreshAll();
@@ -546,24 +563,26 @@
   }
 
   function init() {
-    byId('save-token').onclick = onSaveToken;
+    byId('save-token').onclick = onSaveSetup;
     byId('refresh-btn').onclick = refreshAll;
     byId('settings-btn').onclick = onSettings;
 
-    // Enter key in the token field submits.
-    byId('token-input').onkeydown = function (e) {
+    // Enter key in either setup field submits.
+    function submitOnEnter(e) {
       var key = e.which || e.keyCode;
-      if (key === 13) { onSaveToken(); }
-    };
+      if (key === 13) { onSaveSetup(); }
+    }
+    byId('token-input').onkeydown = submitOnEnter;
+    byId('station-input').onkeydown = submitOnEnter;
 
     // Refresh when the app returns to foreground (iOS resumes from background).
     if (typeof document.addEventListener === 'function') {
       document.addEventListener('visibilitychange', function () {
-        if (!document.hidden && getToken()) { refreshAll(); }
+        if (!document.hidden && isConfigured()) { refreshAll(); }
       }, false);
     }
 
-    if (getToken()) {
+    if (isConfigured()) {
       showDashboard();
       refreshAll();
       startAutoRefresh();

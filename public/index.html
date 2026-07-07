@@ -15,12 +15,14 @@
     <div id="setup" class="screen" style="display:none">
       <div class="setup-box">
         <h1>My Tempest Station</h1>
-        <p class="setup-lead">Enter your Tempest personal access token to connect this device. It is saved only on this device and never leaves your browser.</p>
+        <p class="setup-lead">Connect this device to your Tempest station. Both values are saved only on this device and never leave your browser.</p>
+        <label for="station-input" class="field-label">Station ID</label>
+        <input id="station-input" class="token-input" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="e.g. 12345">
         <label for="token-input" class="field-label">Access token</label>
         <input id="token-input" class="token-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="paste token here">
         <button id="save-token" class="btn btn-primary" type="button">Connect</button>
         <p id="setup-error" class="setup-error" style="display:none"></p>
-        <p class="setup-help">Create a token at tempestwx.com &rarr; Settings &rarr; Data Authorizations &rarr; Create Token.</p>
+        <p class="setup-help">Find your Station ID in the tempestwx.com station URL. Create a token at tempestwx.com &rarr; Settings &rarr; Data Authorizations &rarr; Create Token.</p>
       </div>
     </div>
 
