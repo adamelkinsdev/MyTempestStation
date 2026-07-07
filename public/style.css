@@ -238,6 +238,16 @@ body {
   .clock-date { font-size: 13px; }
 }
 
+.summary {
+  font-size: 15px;
+  line-height: 1.4;
+  color: #cfe0f2;
+  margin-bottom: 14px;
+}
+@media (min-width: 760px) {
+  .summary { font-size: 18px; }
+}
+
 .error-banner {
   background-color: rgba(224, 74, 74, 0.15);
   border: 1px solid rgba(224, 74, 74, 0.45);

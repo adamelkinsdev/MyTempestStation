@@ -206,20 +206,26 @@
   /* ---------- Dew-point comfort ---------- */
 
   // Comfort is driven by dew point (F), the metric people actually feel.
+  function comfortWord(f) {
+    if (f < 55) { return 'Dry'; }
+    if (f < 60) { return 'Comfortable'; }
+    if (f < 65) { return 'Sticky'; }
+    if (f < 70) { return 'Muggy'; }
+    if (f < 75) { return 'Oppressive'; }
+    return 'Sweltering';
+  }
+  function comfortClass(f) {
+    if (f < 60) { return 'comfort-good'; }
+    if (f < 70) { return 'comfort-mid'; }
+    return 'comfort-bad';
+  }
   function renderComfort(dewC) {
     var el = byId('v-comfort');
     if (!el) { return; }
     var d = toNum(dewC);
     if (d === null) { el.innerHTML = '&mdash;'; return; }
     var f = cToF(d);
-    var word, cls;
-    if (f < 55) { word = 'Dry'; cls = 'comfort-good'; }
-    else if (f < 60) { word = 'Comfortable'; cls = 'comfort-good'; }
-    else if (f < 65) { word = 'Sticky'; cls = 'comfort-mid'; }
-    else if (f < 70) { word = 'Muggy'; cls = 'comfort-mid'; }
-    else if (f < 75) { word = 'Oppressive'; cls = 'comfort-bad'; }
-    else { word = 'Sweltering'; cls = 'comfort-bad'; }
-    el.innerHTML = '<span class="' + cls + '">' + word + '</span>';
+    el.innerHTML = '<span class="' + comfortClass(f) + '">' + comfortWord(f) + '</span>';
   }
 
   /* ---------- UV index (WHO color bands) ---------- */
@@ -403,8 +409,66 @@
     }
   }
 
+  function hourLabelLong(lh) {
+    var ap = lh < 12 ? 'AM' : 'PM';
+    var h = lh % 12; if (h === 0) { h = 12; }
+    return h + ' ' + ap;
+  }
+
+  // Scan the next ~12 hours of precip probability into a plain-English clause.
+  function rainOutlook(hourly) {
+    if (!hourly || !hourly.length) { return ''; }
+    var n = Math.min(12, hourly.length);
+    var firstLikely = -1, anyChance = false;
+    for (var i = 0; i < n; i++) {
+      var pp = toNum(hourly[i].precip_probability); if (pp === null) { pp = 0; }
+      if (pp >= 50 && firstLikely < 0) { firstLikely = i; }
+      if (pp >= 30) { anyChance = true; }
+    }
+    if (firstLikely === 0) { return 'Rain likely now.'; }
+    if (firstLikely > 0) {
+      var lh = toNum(hourly[firstLikely].local_hour);
+      return lh === null ? 'Rain likely soon.' : ('Rain likely around ' + hourLabelLong(lh) + '.');
+    }
+    if (anyChance) { return 'A chance of showers later.'; }
+    return '';
+  }
+
+  // Synthesize a one-line summary from the forecast's current conditions + outlook.
+  function renderSummary(data) {
+    var el = byId('summary');
+    if (!el) { return; }
+    var cc = data.current_conditions;
+    if (!cc) { el.innerHTML = '&nbsp;'; return; }
+
+    var s = cc.conditions ? String(cc.conditions) : '';
+    var tF = toNum(cc.air_temperature);
+    if (tF !== null) { s += (s ? ', ' : '') + Math.round(cToF(tF)) + '°'; }
+
+    var dp = toNum(cc.dew_point);
+    if (dp !== null) {
+      var dF = cToF(dp);
+      if (dF >= 60) { s += ' and ' + comfortWord(dF).toLowerCase(); }
+    }
+    if (s) { s += '.'; }
+
+    var g = toNum(cc.wind_gust);
+    if (g !== null) {
+      var gm = mpsToMph(g);
+      if (gm >= 30) { s += ' Windy.'; }
+      else if (gm >= 18) { s += ' Breezy.'; }
+    }
+
+    var ro = data.forecast ? rainOutlook(data.forecast.hourly) : '';
+    if (ro) { s += ' ' + ro; }
+
+    el.innerHTML = s || '&nbsp;';
+  }
+
   function renderForecast(data) {
-    if (!data || !data.forecast) { return; }
+    if (!data) { return; }
+    renderSummary(data);
+    if (!data.forecast) { return; }
     if (data.forecast.daily && data.forecast.daily.length) {
       renderSunArc(data.forecast.daily[0]);
     }
