@@ -23,6 +23,7 @@
   var refreshTimer = null;  // periodic data refresh
   var watchTimer = null;    // 1s ticker driving the watch countdown/fallback
   var watchEndsAt = 0;      // epoch ms when watch mode auto-reverts to idle
+  var sunTimes = null;      // {sr, ss} epoch seconds, for the day/night theme
 
   function byId(id) { return document.getElementById(id); }
 
@@ -323,6 +324,10 @@
     var sr = toNum(day.sunrise), ss = toNum(day.sunset);
     if (sr === null || ss === null || ss <= sr) { return; }
 
+    // Remember these so the clock tick can re-theme as time passes.
+    sunTimes = { sr: sr, ss: ss };
+    applyTheme(sr, ss);
+
     var now = new Date().getTime() / 1000;
     var t = (now - sr) / (ss - sr);
     var night = (t < 0 || t > 1);
@@ -433,6 +438,25 @@
     var dt = byId('clock-date');
     if (t) { t.innerHTML = formatTime(d.getTime() / 1000); }
     if (dt) { dt.innerHTML = DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate(); }
+    // Re-evaluate the day/night theme as time passes (crossing dawn/dusk).
+    if (sunTimes) { applyTheme(sunTimes.sr, sunTimes.ss); }
+  }
+
+  /* ---------- Day/night theme ---------- */
+
+  // Choose a background phase from the sun times, with a ~40 min warm window
+  // around sunrise (dawn) and sunset (dusk).
+  function applyTheme(sr, ss) {
+    var app = byId('app');
+    if (!app || sr === null || ss === null) { return; }
+    var now = new Date().getTime() / 1000;
+    var W = 40 * 60;
+    var cls;
+    if (now < sr - W || now > ss + W) { cls = 'theme-night'; }
+    else if (now < sr + W) { cls = 'theme-dawn'; }
+    else if (now > ss - W) { cls = 'theme-dusk'; }
+    else { cls = 'theme-day'; }
+    if (app.className !== cls) { app.className = cls; }
   }
 
   function formatTime(epochSeconds) {
