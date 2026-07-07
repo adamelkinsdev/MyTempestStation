@@ -1,0 +1,117 @@
+# Project status & build log
+
+A running record of what's been built, how the project works, and what's next.
+Last updated: 2026-07-07.
+
+## What this is
+
+A dependency-free static weather dashboard for a personal **WeatherFlow Tempest**
+station, built specifically to run in **Safari on iOS 10.3.3** (an iPad 4 /
+MD513LL/A wall display). The official Tempest site doesn't run on that old
+WebKit; this does. Deployed on **Firebase Hosting** at
+**https://mytempestst.web.app** and versioned at
+**https://github.com/adamelkinsdev/MyTempestStation**.
+
+## Architecture & hard constraints
+
+- **Plain HTML + CSS + vanilla ES5 JS.** No framework, no build step, no bundler.
+  Three files in `public/`: `index.html`, `style.css`, `app.js`.
+- **iOS 10.3.3 / Safari 10 compatibility is non-negotiable.** The code avoids
+  everything that old WebKit lacks:
+  - JS: `XMLHttpRequest` (not `fetch`), `var`/`function` (no `let`/`const`/arrow
+    fns), no template literals, no Promises/async.
+  - CSS: flexbox with margin gutters (no `gap`), `calc()` for widths, **no** CSS
+    grid, custom properties, or `clamp()`.
+  - Graphics: inline SVG and HTML/CSS bars only (no icon fonts, no external
+    `<use>`, no CDNs).
+- **No secrets in the repo.** The **Station ID** and **API token** are entered
+  per-device on a setup screen and stored in that browser's `localStorage`
+  (`tempest_station`, `tempest_token`). Nothing personal — no station ID, token,
+  or location — lives in source.
+- **Data sources** (both always metric → converted to imperial client-side):
+  - Observations: `swd.weatherflow.com/swd/rest/observations/station/<id>?token=<t>`
+  - Forecast: `swd.weatherflow.com/swd/rest/better_forecast?station_id=<id>&token=<t>`
+- **License:** PolyForm Noncommercial 1.0.0 (`LICENSE`). Free for noncommercial
+  use with attribution; commercial use requires a separate paid license.
+
+## Refresh behavior
+
+- **Idle mode:** observations + forecast every 60s.
+- **Watch mode:** tap **Watch** → 10s observation polling with a live countdown;
+  auto-reverts to Idle after 5 minutes. Tap again to exit early. (Constants in
+  `app.js`: `IDLE_REFRESH_MS`, `WATCH_REFRESH_MS`, `WATCH_DURATION_MS`.)
+- Also refreshes on returning to the foreground (visibilitychange).
+
+## Features shipped
+
+### Core dashboard (Q1)
+Current conditions tiles with unit conversion, per-device token setup, error/stale
+handling, 60s auto-refresh.
+
+- **Wave A** — wind speed bar (0–20 mph, gust/lull markers), rain today-vs-yesterday
+  bars + duration, UV color-band bar.
+- **Wave B** — wind compass dial (rotating SVG needle), lightning proximity radar
+  (distance rings, time-since-last, 3h count).
+- **Wave C** — forecast fetch + sun arc (sunrise→sunset with sun position), 12h
+  rain-chance strip, 24h temperature heat-strip.
+
+### Platform / layout
+- iPad wide-view optimization (1000px shell, 3 tiles/row ≥760px, larger type).
+- Compact temperature banner (was a tall 3-row block).
+- Watch/Idle refresh modes.
+
+### Feature backlog progress (F-series)
+- **F1 ✅ Dew-point comfort** — Humidity tile shows dew point + Dry/Comfortable/
+  Sticky/Muggy/Oppressive/Sweltering.
+- **F2 ✅ Rain last hour** — added to the Rain tile sub-line.
+- **F3 ✅ Header clock + date** — shown from tablet width up.
+- **F4 ✅ Auto day/night theme** — background shifts night/dawn/day/dusk from sun
+  position, re-checked each clock tick (`#app.theme-*` classes).
+- **F5 ✅ Plain-English summary line** — one synthesized sentence under the header
+  (conditions + temp + comfort + wind + rain outlook).
+
+## Remaining backlog (not yet built)
+
+Ordered; build one at a time, deploy + verify + push per checkpoint.
+
+- **F6 · Threshold alerts** *(next up)* — tiles glow when a metric crosses a
+  limit. Agreed defaults: lightning ≤ 10 mi, gust ≥ 25 mph, UV ≥ 6, temp ≤ 34°F.
+  *(Not started — no code yet.)*
+- **Icon/forecast wave:** F7 SVG weather-icon set + conditions hero (text+icon) ·
+  F8 hourly forecast strip · F9 multi-day forecast. (F7's hand-drawn SVG icon set
+  is the key unlock and the main effort; no icon fonts/CDNs on old Safari.)
+- **History wave (build the localStorage history layer once):** F10 history layer
+  → F11 temperature sparkline · F12 pressure sparkline · F13 today's observed
+  high/low · F14 wind rose.
+- **Platform:** F15 add-to-home-screen + offline shell (PWA polish).
+
+## Local development, testing, deploy
+
+```
+# Serve locally over HTTP (file:// breaks localStorage + the API call)
+npx serve public          # or: python -m http.server --directory public 8080
+
+# Deploy (Firebase already authenticated as the owner)
+firebase deploy --only hosting
+```
+
+**Test harnesses** live in the session scratchpad (not committed) and drive the
+real `app.js` through a DOM/localStorage/XHR stub:
+- `test-harness.js` — deterministic render assertions against a canned payload.
+- `test-live.js` — fetches the **real** Tempest API (needs `APP_TOKEN` + `APP_JS`
+  env vars) and prints every rendered tile; used to verify each feature against
+  live data before deploying.
+- `test-watch.js` — drives the Watch/Idle state machine via the button handler.
+
+Verification pattern per feature: `node --check public/app.js` → run
+`test-harness.js` (regression) → run `test-live.js` (real data) → deploy → push.
+
+## Notes / gotchas learned
+
+- The Tempest `obs` array and `better_forecast` are **always metric** regardless
+  of `units_*` query params — convert C→F, m/s→mph, mb→inHg, mm→in, km→mi
+  client-side.
+- `obs[0]` has **no** `wind_direction_cardinal` — computed from `wind_direction`.
+- `lightning_strike_count_last_3hr` is provided directly (no accumulation needed).
+- Station ID for reference during dev: **210198** (Waterford). It is NOT in
+  source — it's entered on the device and stored in localStorage.
