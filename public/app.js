@@ -57,10 +57,19 @@
 
   /* ---------- formatting helpers ---------- */
 
-  function num(value, decimals, suffix) {
+  /* The Tempest "obs" array is ALWAYS metric (deg C, m/s, mb, mm) regardless of
+     any units_* query params, so we convert to imperial here on the client. */
+  function cToF(c) { return c * 9 / 5 + 32; }
+  function mpsToMph(m) { return m * 2.2369362920544; }
+  function mbToInHg(mb) { return mb * 0.0295299830714; }
+  function mmToIn(mm) { return mm * 0.0393700787402; }
+
+  // Format a value: optionally convert units, round to `decimals`, append suffix.
+  function fmt(value, convert, decimals, suffix) {
     if (value === null || value === undefined || value === '') { return '&mdash;'; }
     var n = Number(value);
     if (isNaN(n)) { return '&mdash;'; }
+    if (convert) { n = convert(n); }
     return n.toFixed(decimals) + (suffix || '');
   }
 
@@ -100,11 +109,11 @@
 
     var o = data.obs[0];
 
-    byId('v-temp').innerHTML = num(o.air_temperature, 0, '&deg;');
-    byId('v-feels').innerHTML = num(o.feels_like, 0, '&deg;');
-    byId('v-humidity').innerHTML = num(o.relative_humidity, 0, '%');
-    byId('v-wind').innerHTML = num(o.wind_avg, 1, ' mph');
-    byId('v-gust').innerHTML = num(o.wind_gust, 1, ' mph');
+    byId('v-temp').innerHTML = fmt(o.air_temperature, cToF, 0, '&deg;');
+    byId('v-feels').innerHTML = fmt(o.feels_like, cToF, 0, '&deg;');
+    byId('v-humidity').innerHTML = fmt(o.relative_humidity, null, 0, '%');
+    byId('v-wind').innerHTML = fmt(o.wind_avg, mpsToMph, 1, ' mph');
+    byId('v-gust').innerHTML = fmt(o.wind_gust, mpsToMph, 1, ' mph');
 
     var card = o.wind_direction_cardinal || cardinal(o.wind_direction);
     var deg = (o.wind_direction === null || o.wind_direction === undefined)
@@ -115,9 +124,9 @@
     var pressure = (o.sea_level_pressure !== undefined && o.sea_level_pressure !== null)
       ? o.sea_level_pressure
       : (o.barometric_pressure !== undefined ? o.barometric_pressure : o.station_pressure);
-    byId('v-pressure').innerHTML = num(pressure, 2, ' inHg');
+    byId('v-pressure').innerHTML = fmt(pressure, mbToInHg, 2, ' inHg');
 
-    byId('v-rain').innerHTML = num(o.precip_accum_local_day, 2, ' in');
+    byId('v-rain').innerHTML = fmt(o.precip_accum_local_day, mmToIn, 2, ' in');
 
     // timestamp / staleness
     var stamp = o.timestamp;
@@ -139,9 +148,9 @@
   /* ---------- data fetch ---------- */
 
   function buildUrl(token) {
+    // The obs array is always metric; we convert to imperial in render().
     return 'https://swd.weatherflow.com/swd/rest/observations/station/' + STATION_ID +
-      '?token=' + encodeURIComponent(token) +
-      '&units_temp=f&units_wind=mph&units_pressure=inhg&units_precip=in&units_distance=mi';
+      '?token=' + encodeURIComponent(token);
   }
 
   function fetchData() {
