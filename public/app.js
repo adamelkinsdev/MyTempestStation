@@ -8,10 +8,21 @@
 
   var TOKEN_KEY = 'tempest_token';
   var STATION_KEY = 'tempest_station';
-  var REFRESH_MS = 60000; // auto-refresh every 60 seconds
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
-  var refreshTimer = null;
+  // Refresh cadence. Idle is the normal pace; Watch is a temporary fast pace for
+  // storm-watching that auto-relaxes back to Idle after WATCH_DURATION_MS.
+  var IDLE_REFRESH_MS = 60000;          // 60s normal
+  var WATCH_REFRESH_MS = 10000;         // 10s while watching
+  var WATCH_DURATION_MS = 5 * 60 * 1000; // watch mode lasts 5 minutes
+
+  var MODE_IDLE = 'idle';
+  var MODE_WATCH = 'watch';
+  var mode = MODE_IDLE;
+
+  var refreshTimer = null;  // periodic data refresh
+  var watchTimer = null;    // 1s ticker driving the watch countdown/fallback
+  var watchEndsAt = 0;      // epoch ms when watch mode auto-reverts to idle
 
   function byId(id) { return document.getElementById(id); }
 
@@ -531,14 +542,80 @@
     fetchForecast();
   }
 
-  /* ---------- auto refresh ---------- */
+  /* ---------- auto refresh + watch mode ---------- */
+
+  // Each periodic tick: while watching we pull observations only (the forecast
+  // barely changes minute-to-minute and we don't want to hammer it).
+  function refreshTick() {
+    if (mode === MODE_WATCH) { fetchData(); }
+    else { refreshAll(); }
+  }
+
+  function restartRefreshTimer() {
+    if (refreshTimer) { clearInterval(refreshTimer); }
+    var interval = (mode === MODE_WATCH) ? WATCH_REFRESH_MS : IDLE_REFRESH_MS;
+    refreshTimer = setInterval(refreshTick, interval);
+  }
 
   function startAutoRefresh() {
-    stopAutoRefresh();
-    refreshTimer = setInterval(refreshAll, REFRESH_MS);
+    mode = MODE_IDLE;
+    restartRefreshTimer();
+    updateWatchButton();
   }
+
   function stopAutoRefresh() {
     if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+    stopWatchCountdown();
+    mode = MODE_IDLE;
+    updateWatchButton();
+  }
+
+  function updateWatchButton() {
+    var b = byId('watch-btn');
+    if (!b) { return; }
+    if (mode === MODE_WATCH) {
+      b.className = 'btn btn-ghost btn-active';
+      var rem = Math.ceil((watchEndsAt - new Date().getTime()) / 1000);
+      if (rem < 0) { rem = 0; }
+      var m = Math.floor(rem / 60);
+      var s = rem % 60;
+      b.innerHTML = 'Watching ' + m + ':' + (s < 10 ? '0' : '') + s;
+    } else {
+      b.className = 'btn btn-ghost';
+      b.innerHTML = 'Watch';
+    }
+  }
+
+  function startWatchCountdown() {
+    stopWatchCountdown();
+    watchTimer = setInterval(function () {
+      if (new Date().getTime() >= watchEndsAt) { exitWatch(); }
+      else { updateWatchButton(); }
+    }, 1000);
+  }
+  function stopWatchCountdown() {
+    if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
+  }
+
+  function enterWatch() {
+    mode = MODE_WATCH;
+    watchEndsAt = new Date().getTime() + WATCH_DURATION_MS;
+    restartRefreshTimer();
+    startWatchCountdown();
+    updateWatchButton();
+    fetchData(); // immediate fresh pull on entering
+  }
+
+  function exitWatch() {
+    mode = MODE_IDLE;
+    stopWatchCountdown();
+    restartRefreshTimer();
+    updateWatchButton();
+  }
+
+  function toggleWatch() {
+    if (mode === MODE_WATCH) { exitWatch(); }
+    else { enterWatch(); }
   }
 
   /* ---------- event wiring ---------- */
@@ -565,6 +642,7 @@
   function init() {
     byId('save-token').onclick = onSaveSetup;
     byId('refresh-btn').onclick = refreshAll;
+    byId('watch-btn').onclick = toggleWatch;
     byId('settings-btn').onclick = onSettings;
 
     // Enter key in either setup field submits.

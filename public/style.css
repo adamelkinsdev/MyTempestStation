@@ -125,6 +125,29 @@ body {
   background-color: rgba(255, 255, 255, 0.16);
 }
 
+/* Watch mode active state */
+.btn-active {
+  background-color: #e0692c;
+  color: #ffffff;
+}
+.btn-active:active {
+  background-color: #c85a22;
+}
+
+.header-actions {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-flex-shrink: 0;
+  flex-shrink: 0;
+}
+.header-actions .btn {
+  margin-left: 8px;
+}
+
 .linkbtn {
   background: none;
   border: none;
@@ -221,9 +244,22 @@ body {
   line-height: 1.05;
 }
 
-.tile-value-hero {
-  font-size: 56px;
+/* Compact temperature banner: big number beside its labels, one short row. */
+.hero-banner {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  align-items: center;
 }
+.hero-temp {
+  font-size: 52px;
+  font-weight: 600;
+  line-height: 1;
+  margin-right: 18px;
+}
+.hero-meta .tile-label { margin-bottom: 3px; }
 
 .tile-sub {
   margin-top: 8px;
@@ -548,7 +584,7 @@ body {
   }
 
   /* A little more presence for the headline temperature on the big screen. */
-  .tile-value-hero { font-size: 72px; }
+  .hero-temp { font-size: 60px; }
 
   /* Slightly larger metric numbers read better from across the room. */
   .tile-value { font-size: 34px; }

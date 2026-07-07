@@ -33,16 +33,21 @@
           <h1 id="station-name">My Tempest Station</h1>
           <div id="status-line" class="status-line">Loading&hellip;</div>
         </div>
-        <button id="refresh-btn" class="btn btn-ghost" type="button">Refresh</button>
+        <div class="header-actions">
+          <button id="watch-btn" class="btn btn-ghost" type="button">Watch</button>
+          <button id="refresh-btn" class="btn btn-ghost" type="button">Refresh</button>
+        </div>
       </header>
 
       <div id="error-banner" class="error-banner" style="display:none"></div>
 
       <div id="tiles" class="tiles">
-        <div class="tile tile-hero">
-          <div class="tile-label">Temperature</div>
-          <div id="v-temp" class="tile-value tile-value-hero">&mdash;</div>
-          <div class="tile-sub">Feels like <span id="v-feels">&mdash;</span></div>
+        <div class="tile tile-hero hero-banner">
+          <div id="v-temp" class="hero-temp">&mdash;</div>
+          <div class="hero-meta">
+            <div class="tile-label">Temperature</div>
+            <div class="tile-sub">Feels like <span id="v-feels">&mdash;</span></div>
+          </div>
         </div>
         <div class="tile">
           <div class="tile-label">Humidity</div>
