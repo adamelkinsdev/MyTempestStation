@@ -7,6 +7,13 @@ ui-debug.log
 # Node (only if tooling is added later)
 node_modules/
 
+# Secrets / tokens — never commit these
+tempesttoken.txt
+*token*.txt
+*.token
+.env
+.env.*
+
 # Claude Code local settings
 .claude/
 
