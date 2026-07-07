@@ -539,7 +539,9 @@
     if (!wrap || !iconEl || !textEl) { return; }
     if (!cc) { wrap.style.display = 'none'; return; }
     iconEl.innerHTML = iconSvg(cc.icon ? String(cc.icon) : '', 64);
-    textEl.innerHTML = cc.conditions ? String(cc.conditions) : '&nbsp;';
+    // Plain text from the API -> textContent (not innerHTML) so a condition
+    // string can never inject markup. ' ' is a non-breaking space.
+    textEl.textContent = cc.conditions ? String(cc.conditions) : ' ';
     wrap.style.display = '';
   }
 
