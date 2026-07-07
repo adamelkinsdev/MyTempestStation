@@ -350,6 +350,13 @@ body {
   opacity: 0.5;
 }
 
+/* Threshold alert: tile glows when a metric crosses a limit. */
+.tile-alert {
+  border-color: #ff7a59 !important;
+  -webkit-box-shadow: 0 0 0 1px #ff7a59, 0 0 16px rgba(255, 122, 89, 0.35);
+  box-shadow: 0 0 0 1px #ff7a59, 0 0 16px rgba(255, 122, 89, 0.35);
+}
+
 /* ---------- Pressure trend ---------- */
 
 .comfort-good { color: #7fdca0; font-weight: 600; }

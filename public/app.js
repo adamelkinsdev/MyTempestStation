@@ -20,6 +20,12 @@
   var MODE_WATCH = 'watch';
   var mode = MODE_IDLE;
 
+  // Alert thresholds — a tile glows when its metric crosses one of these.
+  var ALERT_GUST_MPH = 25;
+  var ALERT_UV = 6;
+  var ALERT_TEMP_F = 34;
+  var ALERT_LIGHTNING_MI = 10;
+
   var refreshTimer = null;  // periodic data refresh
   var watchTimer = null;    // 1s ticker driving the watch countdown/fallback
   var watchEndsAt = 0;      // epoch ms when watch mode auto-reverts to idle
@@ -201,6 +207,38 @@
     byId('rainbar-yest').style.width = pct(yestIn, max) + '%';
     byId('rainbar-today-val').innerHTML = todayIn === null ? '&mdash;' : (todayIn > 0 && todayIn < 0.01 ? 'Trace' : todayIn.toFixed(2) + '"');
     byId('rainbar-yest-val').innerHTML = yestIn === null ? '&mdash;' : yestIn.toFixed(2) + '"';
+  }
+
+  /* ---------- Threshold alerts (tile glow) ---------- */
+
+  function hasClass(el, c) { return (' ' + el.className + ' ').indexOf(' ' + c + ' ') !== -1; }
+  function addClass(el, c) { if (!hasClass(el, c)) { el.className = el.className ? (el.className + ' ' + c) : c; } }
+  function removeClass(el, c) {
+    el.className = (' ' + el.className + ' ').replace(' ' + c + ' ', ' ').replace(/^\s+|\s+$/g, '');
+  }
+  function setAlert(id, on) {
+    var el = byId(id);
+    if (!el) { return; }
+    if (on) { addClass(el, 'tile-alert'); } else { removeClass(el, 'tile-alert'); }
+  }
+
+  function applyAlerts(o) {
+    var gust = mpsToMphN(o.wind_gust);
+    setAlert('tile-wind', gust !== null && gust >= ALERT_GUST_MPH);
+
+    var uv = toNum(o.uv);
+    setAlert('tile-uv', uv !== null && uv >= ALERT_UV);
+
+    var tc = toNum(o.air_temperature);
+    var tf = tc === null ? null : cToF(tc);
+    setAlert('tile-temp', tf !== null && tf <= ALERT_TEMP_F);
+
+    // Lightning only alerts for a genuinely recent strike (< 3h) within range.
+    var distKm = toNum(o.lightning_strike_last_distance);
+    var distMi = distKm === null ? null : kmToMi(distKm);
+    var epoch = toNum(o.lightning_strike_last_epoch);
+    var recent = epoch !== null && (new Date().getTime() / 1000 - epoch) < 3 * 3600;
+    setAlert('tile-lightning', recent && distMi !== null && distMi <= ALERT_LIGHTNING_MI);
   }
 
   /* ---------- Dew-point comfort ---------- */
@@ -574,6 +612,7 @@
     renderRain(o);
     renderUV(o.uv);
     renderLightning(o);
+    applyAlerts(o);
 
     // timestamp / staleness
     var stamp = o.timestamp;
