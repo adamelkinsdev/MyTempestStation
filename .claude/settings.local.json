@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "WebFetch(domain:weatherflow.github.io)",
-      "Bash(curl -s -I -H \"Origin: https://mytempestst.web.app\" \"https://swd.weatherflow.com/swd/rest/observations/station/210198?token=test\")",
-      "Bash(curl -s -D - -o /dev/null -H \"Origin: https://mytempestst.web.app\" \"https://swd.weatherflow.com/swd/rest/observations/station/210198?token=bogus\")"
-    ]
-  }
-}

@@ -7,6 +7,9 @@ ui-debug.log
 # Node (only if tooling is added later)
 node_modules/
 
+# Claude Code local settings
+.claude/
+
 # OS / editor
 .DS_Store
 Thumbs.db
