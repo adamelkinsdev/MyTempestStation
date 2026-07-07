@@ -188,6 +188,60 @@
     if (marker) { marker.style.left = pct(uv, 11) + '%'; }
   }
 
+  /* ---------- Wind compass (rotating SVG needle) ---------- */
+
+  // Meteorological wind_direction is the bearing the wind comes FROM. SVG
+  // rotate() is clockwise like compass bearings, so a north-pointing needle
+  // rotated by the bearing points at the source direction.
+  function renderCompass(deg) {
+    var g = byId('compass-needle');
+    if (!g || !g.setAttribute) { return; }
+    var d = (deg === null) ? 0 : deg;
+    g.setAttribute('transform', 'rotate(' + d + ' 50 50)');
+  }
+
+  /* ---------- Lightning proximity ---------- */
+
+  function kmToMi(km) { return km * 0.621371; }
+
+  function fmtAgo(epoch) {
+    var e = toNum(epoch);
+    if (e === null || e <= 0) { return 'None'; }
+    var diff = Math.floor(new Date().getTime() / 1000 - e);
+    if (diff < 0) { diff = 0; }
+    if (diff < 60) { return diff + 's ago'; }
+    if (diff < 3600) { return Math.floor(diff / 60) + 'm ago'; }
+    if (diff < 86400) { return Math.floor(diff / 3600) + 'h ago'; }
+    return Math.floor(diff / 86400) + 'd ago';
+  }
+
+  function renderLightning(o) {
+    var distKm = toNum(o.lightning_strike_last_distance);
+    var distMi = distKm === null ? null : kmToMi(distKm);
+    var epoch = toNum(o.lightning_strike_last_epoch);
+    var c3 = toNum(o.lightning_strike_count_last_3hr);
+
+    byId('v-lightning-last').innerHTML = fmtAgo(epoch);
+    byId('v-lightning-dist').innerHTML = distMi === null ? '&mdash;' : (distMi.toFixed(1) + ' mi');
+    byId('v-lightning-3hr').innerHTML = (c3 === null ? '0' : Math.round(c3));
+
+    // Show the radar dot only for a genuinely recent strike (< 3h) at a real
+    // distance; older strikes leave the radar clear (station dot only).
+    var dot = byId('lightning-dot');
+    if (dot && dot.setAttribute) {
+      var secSince = epoch === null ? null : (new Date().getTime() / 1000 - epoch);
+      var recent = secSince !== null && secSince < 3 * 3600 && distMi !== null;
+      if (recent) {
+        var maxMi = 25;
+        var r = pct(distMi, maxMi) / 100 * 42; // up to the outer ring
+        dot.setAttribute('cy', (50 - r).toFixed(1));
+        dot.setAttribute('opacity', '1');
+      } else {
+        dot.setAttribute('opacity', '0');
+      }
+    }
+  }
+
   // Map the pressure_trend string ("rising"/"falling"/"steady") to a colored
   // arrow + label. Storm-watchers care about this more than the number itself.
   function renderPressureTrend(trend) {
@@ -241,6 +295,7 @@
     byId('v-winddir').innerHTML = card ? (card + deg) : (deg || '&mdash;');
 
     renderWindBar(mpsToMphN(o.wind_avg), mpsToMphN(o.wind_gust), mpsToMphN(o.wind_lull));
+    renderCompass(toNum(o.wind_direction));
 
     // Prefer sea-level pressure; fall back to station/barometric pressure.
     var pressure = (o.sea_level_pressure !== undefined && o.sea_level_pressure !== null)
@@ -251,6 +306,7 @@
 
     renderRain(o);
     renderUV(o.uv);
+    renderLightning(o);
 
     // timestamp / staleness
     var stamp = o.timestamp;

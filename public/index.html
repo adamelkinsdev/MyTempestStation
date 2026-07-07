@@ -48,8 +48,30 @@
         </div>
         <div class="tile">
           <div class="tile-label">Wind</div>
-          <div id="v-wind" class="tile-value">&mdash;</div>
-          <div class="tile-sub">Gust <span id="v-gust">&mdash;</span> &middot; <span id="v-winddir">&mdash;</span></div>
+          <div class="wind-main">
+            <div class="wind-readout">
+              <div id="v-wind" class="tile-value">&mdash;</div>
+              <div class="tile-sub">Gust <span id="v-gust">&mdash;</span> &middot; <span id="v-winddir">&mdash;</span></div>
+            </div>
+            <div class="wind-compass">
+              <svg viewBox="0 0 100 100" class="compass-svg">
+                <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"></circle>
+                <line x1="50" y1="6" x2="50" y2="14" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"></line>
+                <line x1="94" y1="50" x2="86" y2="50" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"></line>
+                <line x1="50" y1="94" x2="50" y2="86" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"></line>
+                <line x1="6" y1="50" x2="14" y2="50" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"></line>
+                <text x="50" y="24" text-anchor="middle" font-size="12" fill="#9fb3c8">N</text>
+                <text x="79" y="54" text-anchor="middle" font-size="11" fill="#7f96ac">E</text>
+                <text x="50" y="82" text-anchor="middle" font-size="11" fill="#7f96ac">S</text>
+                <text x="21" y="54" text-anchor="middle" font-size="11" fill="#7f96ac">W</text>
+                <g id="compass-needle" transform="rotate(0 50 50)">
+                  <polygon points="50,17 45,50 55,50" fill="#ff7a59"></polygon>
+                  <polygon points="50,83 46,50 54,50" fill="rgba(255,255,255,0.35)"></polygon>
+                </g>
+                <circle cx="50" cy="50" r="4" fill="#eaf1f8"></circle>
+              </svg>
+            </div>
+          </div>
           <div class="windbar">
             <div class="windbar-track">
               <div id="windbar-fill" class="windbar-fill"></div>
@@ -90,6 +112,28 @@
             <div class="uvbar-track">
               <span class="uvseg uvseg-low"></span><span class="uvseg uvseg-mod"></span><span class="uvseg uvseg-high"></span><span class="uvseg uvseg-vhigh"></span><span class="uvseg uvseg-extreme"></span>
               <span id="uvbar-marker" class="uvbar-marker"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-label">Lightning</div>
+          <div class="lightning-main">
+            <div class="lightning-radar">
+              <svg viewBox="0 0 100 100" class="radar-svg">
+                <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"></circle>
+                <circle cx="50" cy="50" r="29" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"></circle>
+                <circle cx="50" cy="50" r="14" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1"></circle>
+                <line x1="50" y1="6" x2="50" y2="94" stroke="rgba(255,255,255,0.07)" stroke-width="1"></line>
+                <line x1="6" y1="50" x2="94" y2="50" stroke="rgba(255,255,255,0.07)" stroke-width="1"></line>
+                <circle id="lightning-dot" cx="50" cy="8" r="5" fill="#ffd23f" stroke="#c98a00" stroke-width="1" opacity="0"></circle>
+                <circle cx="50" cy="50" r="3" fill="#6fb2ff"></circle>
+              </svg>
+            </div>
+            <div class="lightning-readout">
+              <div id="v-lightning-last" class="tile-value-sm">&mdash;</div>
+              <div class="tile-sub">Last strike <span id="v-lightning-dist">&mdash;</span></div>
+              <div class="tile-sub"><span id="v-lightning-3hr">0</span> in last 3h</div>
             </div>
           </div>
         </div>
