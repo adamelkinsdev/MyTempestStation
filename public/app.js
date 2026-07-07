@@ -82,6 +82,20 @@
     return CARDINALS[idx];
   }
 
+  // Map the pressure_trend string ("rising"/"falling"/"steady") to a colored
+  // arrow + label. Storm-watchers care about this more than the number itself.
+  function renderPressureTrend(trend) {
+    var el = byId('v-pressure-trend');
+    if (!el) { return; }
+    var t = trend ? String(trend).toLowerCase() : '';
+    var arrow, label, cls;
+    if (t.indexOf('ris') !== -1) { arrow = '↑'; label = 'RISING'; cls = 'trend-up'; }
+    else if (t.indexOf('fall') !== -1) { arrow = '↓'; label = 'FALLING'; cls = 'trend-down'; }
+    else if (t.indexOf('stead') !== -1) { arrow = '→'; label = 'STEADY'; cls = 'trend-flat'; }
+    else { el.innerHTML = '&nbsp;'; return; }
+    el.innerHTML = '<span class="' + cls + '"><span class="trend-arrow">' + arrow + '</span> ' + label + '</span>';
+  }
+
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
   function formatTime(epochSeconds) {
@@ -125,6 +139,7 @@
       ? o.sea_level_pressure
       : (o.barometric_pressure !== undefined ? o.barometric_pressure : o.station_pressure);
     byId('v-pressure').innerHTML = fmt(pressure, mbToInHg, 2, ' inHg');
+    renderPressureTrend(o.pressure_trend);
 
     byId('v-rain').innerHTML = fmt(o.precip_accum_local_day, mmToIn, 2, ' in');
 

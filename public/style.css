@@ -253,3 +253,10 @@ body {
 .is-stale {
   opacity: 0.5;
 }
+
+/* ---------- Pressure trend ---------- */
+
+.trend-up { color: #7fdca0; font-weight: 600; }
+.trend-down { color: #ff9e6b; font-weight: 600; }
+.trend-flat { color: #9fb3c8; font-weight: 600; }
+.trend-arrow { font-size: 15px; }
