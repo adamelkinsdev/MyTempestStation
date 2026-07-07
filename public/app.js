@@ -183,8 +183,16 @@
 
     byId('v-rain').innerHTML = rainText(todayIn);
 
+    // Sub line: rain in the last hour + how long it rained today.
+    var last1Mm = toNum(o.precip_accum_last_1hr);
+    var last1In = last1Mm === null ? null : mmToIn(last1Mm);
     var durToday = fmtDuration(o.precip_minutes_local_day);
-    byId('v-rain-dur').innerHTML = durToday ? ('Rained ' + durToday + ' today') : '&nbsp;';
+    var parts = [];
+    if (last1In !== null) {
+      parts.push('Last hr ' + (last1In > 0 && last1In < 0.01 ? 'Trace' : last1In.toFixed(2) + '"'));
+    }
+    if (durToday) { parts.push('rained ' + durToday + ' today'); }
+    byId('v-rain-dur').innerHTML = parts.length ? parts.join(' &middot; ') : '&nbsp;';
 
     // Scale both bars to the larger of the two (min floor avoids divide-by-zero).
     var max = Math.max(todayIn || 0, yestIn || 0, 0.01);
