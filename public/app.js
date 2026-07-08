@@ -757,6 +757,68 @@
     saveHistory(hist);
   }
 
+  /* ---------- F11/F12: sparklines from history ---------- */
+
+  var SPARK_WINDOW_SEC = 6 * 3600; // show roughly the last 6 hours
+  var SPARK_MAX_PTS = 60;          // downsample target for a light polyline
+
+  // Collect recent values at tuple index `idx`, within the trailing window.
+  function recentSeries(hist, idx) {
+    var cutoff = (new Date().getTime() / 1000) - SPARK_WINDOW_SEC;
+    var vals = [];
+    for (var i = 0; i < hist.length; i++) {
+      var v = hist[i][idx];
+      if (hist[i][0] >= cutoff && v !== null && v !== undefined) { vals.push(v); }
+    }
+    return vals;
+  }
+
+  // Draw a min/max-scaled <polyline> sparkline into `el`. Clears when there
+  // aren't yet 2 points. Y auto-scales to the series range (essential for
+  // pressure's narrow band); a flat series draws as a centered line.
+  function renderSparkline(el, values, color) {
+    if (!el) { return; }
+    var pts = values;
+    if (!pts || pts.length < 2) { el.innerHTML = ''; return; }
+
+    if (pts.length > SPARK_MAX_PTS) {
+      var ds = [];
+      var step = pts.length / SPARK_MAX_PTS;
+      for (var k = 0; k < SPARK_MAX_PTS; k++) { ds.push(pts[Math.floor(k * step)]); }
+      ds.push(pts[pts.length - 1]);
+      pts = ds;
+    }
+
+    var lo = pts[0], hi = pts[0];
+    for (var m = 1; m < pts.length; m++) {
+      if (pts[m] < lo) { lo = pts[m]; }
+      if (pts[m] > hi) { hi = pts[m]; }
+    }
+    var flat = (hi - lo) <= 0;         // steady series (common for pressure)
+    var span = flat ? 1 : (hi - lo);
+
+    var W = 100, H = 30, PAD = 3;
+    var coords = '';
+    for (var j = 0; j < pts.length; j++) {
+      var norm = flat ? 0.5 : (pts[j] - lo) / span; // center a flat line
+      var x = PAD + (j / (pts.length - 1)) * (W - 2 * PAD);
+      var y = PAD + (1 - norm) * (H - 2 * PAD);
+      coords += (j ? ' ' : '') + (Math.round(x * 10) / 10) + ',' + (Math.round(y * 10) / 10);
+    }
+    // preserveAspectRatio="none" stretches to the tile width; non-scaling-stroke
+    // keeps the line an even weight (a no-op fallback on engines that lack it).
+    el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" class="spark-svg">' +
+      '<polyline points="' + coords + '" fill="none" stroke="' + color + '" stroke-width="1.6" ' +
+      'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>';
+  }
+
+  // F11 temperature (tuple idx 1) + F12 pressure (idx 2) trend lines.
+  function renderTrends() {
+    var hist = loadHistory();
+    renderSparkline(byId('temp-spark'), recentSeries(hist, 1), '#ff9d5c');
+    renderSparkline(byId('pressure-spark'), recentSeries(hist, 2), '#6fb2ff');
+  }
+
   /* ---------- rendering ---------- */
 
   function render(data) {
@@ -774,6 +836,7 @@
 
     var o = data.obs[0];
     recordHistory(o);
+    renderTrends();
 
     byId('v-temp').innerHTML = fmt(o.air_temperature, cToF, 0, '&deg;');
     byId('v-feels').innerHTML = fmt(o.feels_like, cToF, 0, '&deg;');

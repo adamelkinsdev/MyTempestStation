@@ -67,6 +67,12 @@ handling, 60s auto-refresh.
   timestamp; `saveHistory` sheds the oldest half on quota/Private-Mode failure.
   Zero extra API calls (Approach A). No UI — the foundation for F11–F14. History
   fills over time, so charts start sparse.
+- **F11 + F12 ✅ Temp & pressure sparklines** — `renderSparkline(el, values, color)`
+  draws a min/max-scaled inline-SVG `<polyline>` (downsampled to ≤60 pts,
+  `preserveAspectRatio="none"` + `non-scaling-stroke`, flat series centered).
+  `renderTrends()` feeds it the last ~6h of history: temperature (orange) under
+  the hero tile, pressure (blue) under the Pressure tile. Clears until ≥2 points
+  exist, so both start blank and fill in as history accrues.
 
 ### Feature backlog progress (F-series)
 - **F1 ✅ Dew-point comfort** — Humidity tile shows dew point + Dry/Comfortable/
@@ -107,9 +113,9 @@ See `SUGGESTED_FEATURES.md` for detailed specs, data fields, and approach per it
   hourly strip~~ · ~~F9 multi-day forecast~~. The icon/forecast wave is fully
   shipped. `iconSvg(key, px)` is the shared unlock; `.fstrip` cells are reused by
   both strips.
-- **History wave** *(F11 is next up)*: ~~F10 history layer~~ ✅ → F11 temperature
-  sparkline · F12 pressure sparkline · F13 today's observed high/low · F14 wind
-  rose. All draw from the F10 `tempest_history` ring buffer.
+- **History wave** *(F13 is next up)*: ~~F10 history layer~~ ✅ → ~~F11 temperature
+  sparkline~~ ✅ · ~~F12 pressure sparkline~~ ✅ · F13 today's observed high/low ·
+  F14 wind rose. All draw from the F10 `tempest_history` ring buffer.
 - **Platform:** F15 add-to-home-screen + offline shell (PWA polish).
 
 ## Local development, testing, deploy

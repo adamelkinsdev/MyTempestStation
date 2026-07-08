@@ -696,6 +696,10 @@ body {
 .dhi { color: #eaf1f8; font-weight: 600; }
 .dlo { color: #8ea6bd; }
 
+/* F11/F12 sparklines — thin trend lines under the temp + pressure tiles. */
+.sparkline { margin-top: 8px; line-height: 0; }
+.spark-svg { display: block; width: 100%; height: 30px; }
+
 /* ---------- Wide screens: iPad landscape (1024px) and portrait (768px) ----------
    The base layout tops out at 640px; on the iPad's wide view that wastes most of
    the screen. Here we widen the shell, go to 3 metric tiles per row, and keep the

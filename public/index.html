@@ -48,16 +48,19 @@
       <div id="error-banner" class="error-banner" style="display:none"></div>
 
       <div id="tiles" class="tiles">
-        <div class="tile tile-hero hero-banner" id="tile-temp">
-          <div id="v-temp" class="hero-temp">&mdash;</div>
-          <div class="hero-meta">
-            <div class="tile-label">Temperature</div>
-            <div class="tile-sub">Feels like <span id="v-feels">&mdash;</span></div>
+        <div class="tile tile-hero" id="tile-temp">
+          <div class="hero-banner">
+            <div id="v-temp" class="hero-temp">&mdash;</div>
+            <div class="hero-meta">
+              <div class="tile-label">Temperature</div>
+              <div class="tile-sub">Feels like <span id="v-feels">&mdash;</span></div>
+            </div>
+            <div class="hero-cond" id="hero-cond" style="display:none">
+              <span class="hero-cond-icon" id="cond-icon"></span>
+              <span class="hero-cond-text" id="cond-text">&mdash;</span>
+            </div>
           </div>
-          <div class="hero-cond" id="hero-cond" style="display:none">
-            <span class="hero-cond-icon" id="cond-icon"></span>
-            <span class="hero-cond-text" id="cond-text">&mdash;</span>
-          </div>
+          <div id="temp-spark" class="sparkline"></div>
         </div>
         <div class="tile">
           <div class="tile-label">Humidity</div>
@@ -103,6 +106,7 @@
           <div class="tile-label">Pressure</div>
           <div id="v-pressure" class="tile-value">&mdash;</div>
           <div class="tile-sub"><span id="v-pressure-trend">&nbsp;</span></div>
+          <div id="pressure-spark" class="sparkline"></div>
         </div>
         <div class="tile">
           <div class="tile-label">Rain</div>
