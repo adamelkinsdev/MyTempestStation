@@ -83,16 +83,22 @@ handling, 60s auto-refresh.
   label + F7 icon (34px) + temp°F + precip%. Cells are fixed-width `inline-block`
   with margins in an `overflow-x:auto` container (no `gap`). 0% precip is drawn
   transparent to keep vertical rhythm without clutter.
+- **F9 ✅ Multi-day forecast** — new full-width tile "Next days": a row of up to 8
+  day-cells (`renderDaily`), each with weekday label (`Today` for day 0, else
+  `DOW[getDay()]` from `day_start_local`) + F7 icon + hi/lo °F + precip%, from
+  `forecast.daily[]`. Reuses the hourly-strip styles + `iconSvg()`. This is the
+  answer to the "daily forecast" ask — served off the existing Tempest
+  `better_forecast`, no NOAA/second data source needed.
 
 ## Remaining backlog (not yet built)
 
 Ordered; build one at a time, deploy + verify + push per checkpoint.
 See `SUGGESTED_FEATURES.md` for detailed specs, data fields, and approach per item.
 
-- **Icon/forecast wave** *(F9 is next up)*: ~~F7 SVG weather-icon set + conditions
-  hero~~ ✅ · ~~F8 hourly forecast strip~~ ✅ · F9 multi-day forecast (row of days:
-  icon + hi/lo + precip%, from `forecast.daily[]`; reuses `iconSvg()`). This also
-  satisfies the owner's "daily forecast" interest — decided against adding NOAA.
+- **Icon/forecast wave — COMPLETE** ✅: ~~F7 icon set + conditions hero~~ · ~~F8
+  hourly strip~~ · ~~F9 multi-day forecast~~. The icon/forecast wave is fully
+  shipped. `iconSvg(key, px)` is the shared unlock; `.fstrip` cells are reused by
+  both strips.
 - **History wave (build the localStorage history layer once):** F10 history layer
   → F11 temperature sparkline · F12 pressure sparkline · F13 today's observed
   high/low · F14 wind rose.

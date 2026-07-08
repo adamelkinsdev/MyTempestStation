@@ -684,6 +684,18 @@ body {
 }
 .fprecip { font-size: 12px; margin-top: 1px; }
 
+/* F9 multi-day cells — reuse .fstrip/.fhour/.ficon/.fprecip; hi/lo pair here. */
+.dcell {
+  display: inline-block;
+  vertical-align: top;
+  text-align: center;
+  width: 60px;
+  margin-right: 6px;
+}
+.dtemps { margin-top: 2px; font-size: 14px; white-space: nowrap; }
+.dhi { color: #eaf1f8; font-weight: 600; }
+.dlo { color: #8ea6bd; }
+
 /* ---------- Wide screens: iPad landscape (1024px) and portrait (768px) ----------
    The base layout tops out at 640px; on the iPad's wide view that wastes most of
    the screen. Here we widen the shell, go to 3 metric tiles per row, and keep the
@@ -711,12 +723,14 @@ body {
   .hero-cond-icon svg { width: 80px; height: 80px; }
   .hero-cond-text { font-size: 21px; max-width: 150px; }
 
-  /* Roomier hourly cells + bigger icons on the wide wall view. */
+  /* Roomier hourly + daily cells and bigger icons on the wide wall view. */
   .fcell { width: 62px; margin-right: 8px; }
+  .dcell { width: 74px; margin-right: 8px; }
   .ficon svg { width: 42px; height: 42px; }
   .fhour { font-size: 13px; }
   .ftemp { font-size: 18px; }
   .fprecip { font-size: 13px; }
+  .dtemps { font-size: 16px; }
 
   /* Slightly larger metric numbers read better from across the room. */
   .tile-value { font-size: 34px; }

@@ -477,6 +477,35 @@
     strip.innerHTML = cells;
   }
 
+  // F9: multi-day forecast — a row of upcoming days (icon + hi/lo + precip%)
+  // from forecast.daily[]. Weekday derived from day_start_local (local midnight
+  // epoch) via the DOW array. Same iOS-10-safe innerHTML story as the hourly
+  // strip: only whitelisted icon markup and formatted numbers.
+  function renderDaily(daily) {
+    var strip = byId('daily-strip');
+    if (!strip || !daily || !daily.length) { return; }
+    var n = Math.min(8, daily.length);
+    var cells = '';
+    for (var i = 0; i < n; i++) {
+      var d = daily[i];
+      var ds = toNum(d.day_start_local);
+      var lbl = (ds === null) ? '' : (i === 0 ? 'Today' : DOW[new Date(ds * 1000).getDay()]);
+      var hiC = toNum(d.air_temp_high); var hi = hiC === null ? null : Math.round(cToF(hiC));
+      var loC = toNum(d.air_temp_low); var lo = loC === null ? null : Math.round(cToF(loC));
+      var pp = toNum(d.precip_probability); if (pp === null) { pp = 0; }
+      var showPp = pp >= 5;
+      cells += '<div class="dcell">' +
+        '<div class="fhour">' + lbl + '</div>' +
+        '<div class="ficon">' + iconSvg(d.icon ? String(d.icon) : '', 34) + '</div>' +
+        '<div class="dtemps"><span class="dhi">' + (hi === null ? '&mdash;' : hi + '&deg;') + '</span> ' +
+          '<span class="dlo">' + (lo === null ? '&mdash;' : lo + '&deg;') + '</span></div>' +
+        '<div class="fprecip" style="color:' + (showPp ? precipColor(pp) : 'transparent') + '">' +
+          (showPp ? Math.round(pp) + '%' : '0') + '</div>' +
+        '</div>';
+    }
+    strip.innerHTML = cells;
+  }
+
   function hourLabelLong(lh) {
     var ap = lh < 12 ? 'AM' : 'PM';
     var h = lh % 12; if (h === 0) { h = 12; }
@@ -612,6 +641,7 @@
     if (!data.forecast) { return; }
     if (data.forecast.daily && data.forecast.daily.length) {
       renderSunArc(data.forecast.daily[0]);
+      renderDaily(data.forecast.daily);
     }
     renderHourly(data.forecast.hourly);
   }
