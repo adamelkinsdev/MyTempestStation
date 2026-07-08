@@ -819,6 +819,28 @@
     renderSparkline(byId('pressure-spark'), recentSeries(hist, 2), '#6fb2ff');
   }
 
+  // F13: today's OBSERVED high/low (from history since local midnight) — distinct
+  // from the forecast hi/lo. Includes the latest reading (just recorded).
+  function renderObservedHiLo() {
+    var el = byId('v-hilo');
+    if (!el) { return; }
+    var midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    var dayStart = midnight.getTime() / 1000;
+    var hist = loadHistory();
+    var lo = null, hi = null;
+    for (var i = 0; i < hist.length; i++) {
+      if (hist[i][0] < dayStart) { continue; }
+      var tc = hist[i][1];
+      if (tc === null || tc === undefined) { continue; }
+      var tf = cToF(tc);
+      if (lo === null || tf < lo) { lo = tf; }
+      if (hi === null || tf > hi) { hi = tf; }
+    }
+    if (lo === null) { el.innerHTML = '&nbsp;'; return; }
+    el.innerHTML = 'Today <span class="hilo-hi">&uarr;' + Math.round(hi) + '&deg;</span> ' +
+      '<span class="hilo-lo">&darr;' + Math.round(lo) + '&deg;</span>';
+  }
+
   /* ---------- rendering ---------- */
 
   function render(data) {
@@ -837,6 +859,7 @@
     var o = data.obs[0];
     recordHistory(o);
     renderTrends();
+    renderObservedHiLo();
 
     byId('v-temp').innerHTML = fmt(o.air_temperature, cToF, 0, '&deg;');
     byId('v-feels').innerHTML = fmt(o.feels_like, cToF, 0, '&deg;');

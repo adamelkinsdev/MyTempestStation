@@ -700,6 +700,10 @@ body {
 .sparkline { margin-top: 8px; line-height: 0; }
 .spark-svg { display: block; width: 100%; height: 30px; }
 
+/* F13 today's observed high/low */
+.hilo-hi { color: #ff9d5c; font-weight: 600; }
+.hilo-lo { color: #7fb2e0; font-weight: 600; }
+
 /* ---------- Wide screens: iPad landscape (1024px) and portrait (768px) ----------
    The base layout tops out at 640px; on the iPad's wide view that wastes most of
    the screen. Here we widen the shell, go to 3 metric tiles per row, and keep the

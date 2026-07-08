@@ -73,6 +73,10 @@ handling, 60s auto-refresh.
   `renderTrends()` feeds it the last ~6h of history: temperature (orange) under
   the hero tile, pressure (blue) under the Pressure tile. Clears until ≥2 points
   exist, so both start blank and fill in as history accrues.
+- **F13 ✅ Today's observed high/low** — `renderObservedHiLo()` scans history
+  since local midnight for the actual min/max temp so far today (↑hi ↓lo, warm/
+  cool colored), shown as a sub-line in the hero tile. Distinct from the forecast
+  hi/lo; includes the latest reading.
 
 ### Feature backlog progress (F-series)
 - **F1 ✅ Dew-point comfort** — Humidity tile shows dew point + Dry/Comfortable/
@@ -113,9 +117,9 @@ See `SUGGESTED_FEATURES.md` for detailed specs, data fields, and approach per it
   hourly strip~~ · ~~F9 multi-day forecast~~. The icon/forecast wave is fully
   shipped. `iconSvg(key, px)` is the shared unlock; `.fstrip` cells are reused by
   both strips.
-- **History wave** *(F13 is next up)*: ~~F10 history layer~~ ✅ → ~~F11 temperature
-  sparkline~~ ✅ · ~~F12 pressure sparkline~~ ✅ · F13 today's observed high/low ·
-  F14 wind rose. All draw from the F10 `tempest_history` ring buffer.
+- **History wave** *(F14 is next up)*: ~~F10 history layer~~ ✅ → ~~F11 temperature
+  sparkline~~ ✅ · ~~F12 pressure sparkline~~ ✅ · ~~F13 today's observed high/low~~ ✅
+  · F14 wind rose. All draw from the F10 `tempest_history` ring buffer.
 - **Platform:** F15 add-to-home-screen + offline shell (PWA polish).
 
 ## Local development, testing, deploy
