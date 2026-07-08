@@ -60,6 +60,14 @@ handling, 60s auto-refresh.
 - Compact temperature banner (was a tall 3-row block).
 - Watch/Idle refresh modes.
 
+### History wave (F10–F14)
+- **F10 ✅ History layer** — `recordHistory(o)` appends each observation to a
+  `localStorage` ring buffer (`tempest_history`, cap 1500 ≈ 24h at 60s) as a lean
+  numeric tuple `[ts, tempC, pressureMb, windDirDeg, windAvgMps]`. Deduped by
+  timestamp; `saveHistory` sheds the oldest half on quota/Private-Mode failure.
+  Zero extra API calls (Approach A). No UI — the foundation for F11–F14. History
+  fills over time, so charts start sparse.
+
 ### Feature backlog progress (F-series)
 - **F1 ✅ Dew-point comfort** — Humidity tile shows dew point + Dry/Comfortable/
   Sticky/Muggy/Oppressive/Sweltering.
@@ -99,9 +107,9 @@ See `SUGGESTED_FEATURES.md` for detailed specs, data fields, and approach per it
   hourly strip~~ · ~~F9 multi-day forecast~~. The icon/forecast wave is fully
   shipped. `iconSvg(key, px)` is the shared unlock; `.fstrip` cells are reused by
   both strips.
-- **History wave (build the localStorage history layer once):** F10 history layer
-  → F11 temperature sparkline · F12 pressure sparkline · F13 today's observed
-  high/low · F14 wind rose.
+- **History wave** *(F11 is next up)*: ~~F10 history layer~~ ✅ → F11 temperature
+  sparkline · F12 pressure sparkline · F13 today's observed high/low · F14 wind
+  rose. All draw from the F10 `tempest_history` ring buffer.
 - **Platform:** F15 add-to-home-screen + offline shell (PWA polish).
 
 ## Local development, testing, deploy

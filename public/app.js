@@ -8,6 +8,8 @@
 
   var TOKEN_KEY = 'tempest_token';
   var STATION_KEY = 'tempest_station';
+  var HISTORY_KEY = 'tempest_history';
+  var HISTORY_MAX = 1500;         // ring-buffer cap (~24h at the 60s idle poll)
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
   // Refresh cadence. Idle is the normal pace; Watch is a temporary fast pace for
@@ -702,6 +704,59 @@
     return h12 + ':' + pad2(d.getMinutes()) + ' ' + ampm;
   }
 
+  /* ---------- F10: observation history (localStorage ring buffer) ---------- */
+  // A rolling client-side record so F11+ (sparklines, observed hi/lo, wind rose)
+  // have data to draw. Zero extra API calls — we just capture each obs we already
+  // poll. Tuples are lean + numeric to keep localStorage (shared with the token)
+  // small: [ts(sec), tempC, pressureMb, windDirDeg, windAvgMps].
+
+  function loadHistory() {
+    try {
+      var raw = localStorage.getItem(HISTORY_KEY);
+      if (!raw) { return []; }
+      var arr = JSON.parse(raw);
+      return (arr && arr.length) ? arr : [];
+    } catch (e) { return []; }
+  }
+
+  function saveHistory(arr) {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(arr));
+    } catch (e) {
+      // Quota (or old-Safari Private Mode, where setItem throws). Shed the oldest
+      // half and try once more so we degrade instead of losing all history.
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(Math.floor(arr.length / 2)))); }
+      catch (e2) {}
+    }
+  }
+
+  function round1(v) { return v === null ? null : Math.round(v * 10) / 10; }
+
+  // Append one observation, deduped by timestamp, capped to a ring buffer.
+  function recordHistory(o) {
+    if (!o) { return; }
+    var ts = toNum(o.timestamp);
+    if (ts === null) { return; }
+
+    var hist = loadHistory();
+    // Same observation re-rendered (e.g. a foreground refresh): don't duplicate.
+    if (hist.length && hist[hist.length - 1][0] === ts) { return; }
+
+    var press = toNum(o.sea_level_pressure);
+    if (press === null) { press = toNum(o.barometric_pressure); }
+    if (press === null) { press = toNum(o.station_pressure); }
+
+    hist.push([
+      ts,
+      round1(toNum(o.air_temperature)),
+      round1(press),
+      (toNum(o.wind_direction) === null) ? null : Math.round(toNum(o.wind_direction)),
+      round1(toNum(o.wind_avg))
+    ]);
+    if (hist.length > HISTORY_MAX) { hist = hist.slice(hist.length - HISTORY_MAX); }
+    saveHistory(hist);
+  }
+
   /* ---------- rendering ---------- */
 
   function render(data) {
@@ -718,6 +773,7 @@
     }
 
     var o = data.obs[0];
+    recordHistory(o);
 
     byId('v-temp').innerHTML = fmt(o.air_temperature, cToF, 0, '&deg;');
     byId('v-feels').innerHTML = fmt(o.feels_like, cToF, 0, '&deg;');
