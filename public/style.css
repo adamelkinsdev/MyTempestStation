@@ -704,6 +704,11 @@ body {
 .hilo-hi { color: #ff9d5c; font-weight: 600; }
 .hilo-lo { color: #7fb2e0; font-weight: 600; }
 
+/* F14 wind rose */
+.windrose { margin-top: 8px; text-align: center; }
+.rose-svg { display: inline-block; width: 128px; height: 128px; }
+.rose-empty { font-size: 12px; color: #7f96ac; padding: 40px 0; }
+
 /* ---------- Wide screens: iPad landscape (1024px) and portrait (768px) ----------
    The base layout tops out at 640px; on the iPad's wide view that wastes most of
    the screen. Here we widen the shell, go to 3 metric tiles per row, and keep the

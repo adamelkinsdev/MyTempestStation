@@ -77,6 +77,11 @@ handling, 60s auto-refresh.
   since local midnight for the actual min/max temp so far today (↑hi ↓lo, warm/
   cool colored), shown as a sub-line in the hero tile. Distinct from the forecast
   hi/lo; includes the latest reading.
+- **F14 ✅ Wind rose** — `renderWindRose()` bins history's wind direction into 8
+  compass sectors weighted by `wind_avg`, drawn as inline-SVG wedges (one `<path>`
+  per active sector, length scaled to the busiest, 3-step blue intensity) in a new
+  "Wind rose" tile. Shows "Gathering wind history…" until there's moving wind.
+  Completes the history wave.
 
 ### Feature backlog progress (F-series)
 - **F1 ✅ Dew-point comfort** — Humidity tile shows dew point + Dry/Comfortable/
@@ -117,10 +122,13 @@ See `SUGGESTED_FEATURES.md` for detailed specs, data fields, and approach per it
   hourly strip~~ · ~~F9 multi-day forecast~~. The icon/forecast wave is fully
   shipped. `iconSvg(key, px)` is the shared unlock; `.fstrip` cells are reused by
   both strips.
-- **History wave** *(F14 is next up)*: ~~F10 history layer~~ ✅ → ~~F11 temperature
-  sparkline~~ ✅ · ~~F12 pressure sparkline~~ ✅ · ~~F13 today's observed high/low~~ ✅
-  · F14 wind rose. All draw from the F10 `tempest_history` ring buffer.
-- **Platform:** F15 add-to-home-screen + offline shell (PWA polish).
+- **History wave — COMPLETE** ✅: ~~F10 history layer~~ · ~~F11 temp sparkline~~ ·
+  ~~F12 pressure sparkline~~ · ~~F13 observed hi/lo~~ · ~~F14 wind rose~~. All draw
+  from the F10 `tempest_history` ring buffer.
+- **Platform** *(F15 is next up — the last backlog item)*: F15 add-to-home-screen
+  + last-reading shell — no Service Worker on iOS 10.3.3, so cache the last
+  observation JSON in localStorage and render it on load before the network
+  returns.
 
 ## Local development, testing, deploy
 

@@ -841,6 +841,67 @@
       '<span class="hilo-lo">&darr;' + Math.round(lo) + '&deg;</span>';
   }
 
+  /* ---------- F14: wind rose ---------- */
+
+  // Point on a compass circle: deg measured clockwise from North (up).
+  function rosePoint(cx, cy, r, deg) {
+    var t = deg * Math.PI / 180;
+    return {
+      x: Math.round((cx + r * Math.sin(t)) * 100) / 100,
+      y: Math.round((cy - r * Math.cos(t)) * 100) / 100
+    };
+  }
+
+  function roseColor(frac) {
+    if (frac < 0.34) { return '#3f6b8f'; }
+    if (frac < 0.67) { return '#4a9fd0'; }
+    return '#6fb2ff';
+  }
+
+  // Polar plot of which directions the wind has blown FROM, weighted by speed.
+  // Bins history's wind_direction into 8 sectors, sums wind_avg per sector, and
+  // draws one SVG wedge per sector with length scaled to the busiest sector.
+  function renderWindRose() {
+    var el = byId('windrose');
+    if (!el) { return; }
+    var hist = loadHistory();
+    var SECTORS = 8;
+    var sums = [0, 0, 0, 0, 0, 0, 0, 0];
+    var any = false;
+    for (var i = 0; i < hist.length; i++) {
+      var dir = hist[i][3], spd = hist[i][4];
+      if (dir === null || dir === undefined || spd === null || spd === undefined || spd <= 0) { continue; }
+      var s = Math.round(dir / 45) % SECTORS; if (s < 0) { s += SECTORS; }
+      sums[s] += spd;
+      any = true;
+    }
+    if (!any) { el.innerHTML = '<div class="rose-empty">Gathering wind history&hellip;</div>'; return; }
+
+    var max = 0;
+    for (var m = 0; m < SECTORS; m++) { if (sums[m] > max) { max = sums[m]; } }
+    if (max <= 0) { max = 1; }
+
+    var cx = 50, cy = 50, rmax = 42;
+    var wedges = '';
+    for (var k = 0; k < SECTORS; k++) {
+      if (sums[k] <= 0) { continue; }
+      var r = 9 + (sums[k] / max) * (rmax - 9); // min stub so small sectors show
+      var p0 = rosePoint(cx, cy, r, k * 45 - 22.5);
+      var p1 = rosePoint(cx, cy, r, k * 45 + 22.5);
+      wedges += '<path d="M' + cx + ' ' + cy + ' L' + p0.x + ' ' + p0.y +
+        ' A' + r + ' ' + r + ' 0 0 1 ' + p1.x + ' ' + p1.y + ' Z" fill="' + roseColor(sums[k] / max) + '"/>';
+    }
+    el.innerHTML = '<svg viewBox="0 0 100 100" class="rose-svg">' +
+      '<circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"></circle>' +
+      '<circle cx="50" cy="50" r="21" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"></circle>' +
+      wedges +
+      '<text x="50" y="13" text-anchor="middle" font-size="9" fill="#9fb3c8">N</text>' +
+      '<text x="89" y="53" text-anchor="middle" font-size="8" fill="#7f96ac">E</text>' +
+      '<text x="50" y="95" text-anchor="middle" font-size="8" fill="#7f96ac">S</text>' +
+      '<text x="11" y="53" text-anchor="middle" font-size="8" fill="#7f96ac">W</text>' +
+      '</svg>';
+  }
+
   /* ---------- rendering ---------- */
 
   function render(data) {
@@ -860,6 +921,7 @@
     recordHistory(o);
     renderTrends();
     renderObservedHiLo();
+    renderWindRose();
 
     byId('v-temp').innerHTML = fmt(o.air_temperature, cToF, 0, '&deg;');
     byId('v-feels').innerHTML = fmt(o.feels_like, cToF, 0, '&deg;');
