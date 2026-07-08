@@ -83,6 +83,15 @@ handling, 60s auto-refresh.
   "Wind rose" tile. Shows "Gathering wind history…" until there's moving wind.
   Completes the history wave.
 
+### Platform
+- **F15 ✅ Add-to-home-screen + last-reading shell** — Apple home-screen metas
+  (`apple-mobile-web-app-title`) + a generated 180×180 `apple-touch-icon.png`
+  (slate + brand sun). No Service Worker on iOS 10.3.3, so instead each network
+  success caches its obs/forecast JSON (`tempest_last_obs`/`tempest_last_forecast`
+  via `saveLast`), and `init()` calls `renderCached()` to repaint the last-known
+  reading on load before the network returns — instant display, and the panel
+  keeps showing the last reading through a dropped connection.
+
 ### Feature backlog progress (F-series)
 - **F1 ✅ Dew-point comfort** — Humidity tile shows dew point + Dry/Comfortable/
   Sticky/Muggy/Oppressive/Sweltering.
@@ -113,22 +122,15 @@ handling, 60s auto-refresh.
   answer to the "daily forecast" ask — served off the existing Tempest
   `better_forecast`, no NOAA/second data source needed.
 
-## Remaining backlog (not yet built)
+## Remaining backlog
 
-Ordered; build one at a time, deploy + verify + push per checkpoint.
-See `SUGGESTED_FEATURES.md` for detailed specs, data fields, and approach per item.
-
-- **Icon/forecast wave — COMPLETE** ✅: ~~F7 icon set + conditions hero~~ · ~~F8
-  hourly strip~~ · ~~F9 multi-day forecast~~. The icon/forecast wave is fully
-  shipped. `iconSvg(key, px)` is the shared unlock; `.fstrip` cells are reused by
-  both strips.
-- **History wave — COMPLETE** ✅: ~~F10 history layer~~ · ~~F11 temp sparkline~~ ·
-  ~~F12 pressure sparkline~~ · ~~F13 observed hi/lo~~ · ~~F14 wind rose~~. All draw
-  from the F10 `tempest_history` ring buffer.
-- **Platform** *(F15 is next up — the last backlog item)*: F15 add-to-home-screen
-  + last-reading shell — no Service Worker on iOS 10.3.3, so cache the last
-  observation JSON in localStorage and render it on load before the network
-  returns.
+**The F1–F15 backlog is fully shipped.** 🎉 The icon/forecast wave (F7–F9), the
+history wave (F10–F14), and the F15 platform polish are all complete, deployed,
+and pushed. See `SUGGESTED_FEATURES.md` §6 for the optional "fresh ideas" pool
+(heat-stress WBGT badge, feels-like delta, solar/brightness gauge, pressure storm
+nowcast, configurable alert thresholds UI, rotating detail panels, sunrise/sunset
+countdown, season/almanac line) — none of these are committed work, just the
+candidate pond if the owner wants more.
 
 ## Local development, testing, deploy
 

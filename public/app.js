@@ -10,6 +10,8 @@
   var STATION_KEY = 'tempest_station';
   var HISTORY_KEY = 'tempest_history';
   var HISTORY_MAX = 1500;         // ring-buffer cap (~24h at the 60s idle poll)
+  var LAST_OBS_KEY = 'tempest_last_obs';       // F15: last-known payloads so the
+  var LAST_FC_KEY = 'tempest_last_forecast';   // wall display paints on load
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
   // Refresh cadence. Idle is the normal pace; Watch is a temporary fast pace for
@@ -757,6 +759,27 @@
     saveHistory(hist);
   }
 
+  /* ---------- F15: last-known payload cache ---------- */
+  // iOS 10.3.3 has no Service Worker, so we can't truly cache offline. Instead we
+  // stash the last successful obs + forecast JSON in localStorage and repaint it
+  // on load before the network returns — instant display, and the wall panel
+  // still shows the last reading through a dropped connection.
+
+  function saveLast(key, data) {
+    try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
+  }
+
+  function renderCached() {
+    try {
+      var o = localStorage.getItem(LAST_OBS_KEY);
+      if (o) { render(JSON.parse(o)); }
+    } catch (e) {}
+    try {
+      var f = localStorage.getItem(LAST_FC_KEY);
+      if (f) { renderForecast(JSON.parse(f)); }
+    } catch (e) {}
+  }
+
   /* ---------- F11/F12: sparklines from history ---------- */
 
   var SPARK_WINDOW_SEC = 6 * 3600; // show roughly the last 6 hours
@@ -994,6 +1017,7 @@
         var data = null;
         try { data = JSON.parse(xhr.responseText); }
         catch (e) { setStatus('Error'); setError('Received malformed data from the weather service.'); return; }
+        saveLast(LAST_OBS_KEY, data);
         render(data);
       } else if (xhr.status === 401 || xhr.status === 403) {
         setStatus('Token rejected');
@@ -1037,6 +1061,7 @@
       if (xhr.readyState !== 4 || xhr.status !== 200) { return; }
       var data = null;
       try { data = JSON.parse(xhr.responseText); } catch (e) { return; }
+      saveLast(LAST_FC_KEY, data);
       renderForecast(data);
     };
     xhr.send();
@@ -1172,7 +1197,8 @@
 
     if (isConfigured()) {
       showDashboard();
-      refreshAll();
+      renderCached();   // instant paint from the last-known reading
+      refreshAll();     // then refresh from the network
       startAutoRefresh();
     } else {
       showSetup('');
