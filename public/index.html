@@ -50,7 +50,7 @@
       <div id="error-banner" class="error-banner" style="display:none"></div>
 
       <div id="tiles" class="tiles">
-        <div class="tile tile-hero" id="tile-temp">
+        <div class="tile tile-hero" id="tile-temp" data-mod="temp">
           <div class="hero-banner">
             <div id="v-temp" class="hero-temp">&mdash;</div>
             <div class="hero-meta">
@@ -65,12 +65,12 @@
           </div>
           <div id="temp-spark" class="sparkline"></div>
         </div>
-        <div class="tile">
+        <div class="tile" data-mod="humidity">
           <div class="tile-label">Humidity</div>
           <div id="v-humidity" class="tile-value">&mdash;</div>
           <div class="tile-sub">Dew point <span id="v-dewpoint">&mdash;</span> &middot; <span id="v-comfort">&mdash;</span></div>
         </div>
-        <div class="tile" id="tile-wind">
+        <div class="tile" id="tile-wind" data-mod="wind">
           <div class="tile-label">Wind</div>
           <div class="wind-main">
             <div class="wind-readout">
@@ -105,13 +105,13 @@
             <div class="bar-scale"><span>0</span><span>20 mph</span></div>
           </div>
         </div>
-        <div class="tile">
+        <div class="tile" data-mod="pressure">
           <div class="tile-label">Pressure</div>
           <div id="v-pressure" class="tile-value">&mdash;</div>
           <div class="tile-sub"><span id="v-pressure-trend">&nbsp;</span></div>
           <div id="pressure-spark" class="sparkline"></div>
         </div>
-        <div class="tile">
+        <div class="tile" data-mod="rain">
           <div class="tile-label">Rain</div>
           <div id="v-rain" class="tile-value">&mdash;</div>
           <div class="tile-sub" id="v-rain-dur">&nbsp;</div>
@@ -129,7 +129,7 @@
           </div>
         </div>
 
-        <div class="tile" id="tile-uv">
+        <div class="tile" id="tile-uv" data-mod="uv">
           <div class="tile-label">UV Index</div>
           <div id="v-uv" class="tile-value">&mdash;</div>
           <div class="tile-sub" id="v-uv-cat">&nbsp;</div>
@@ -141,7 +141,7 @@
           </div>
         </div>
 
-        <div class="tile" id="tile-lightning">
+        <div class="tile" id="tile-lightning" data-mod="lightning">
           <div class="tile-label">Lightning</div>
           <div class="lightning-main">
             <div class="lightning-radar">
@@ -163,22 +163,22 @@
           </div>
         </div>
 
-        <div class="tile" id="tile-windrose">
+        <div class="tile" id="tile-windrose" data-mod="windrose">
           <div class="tile-label">Wind rose</div>
           <div id="windrose" class="windrose"></div>
         </div>
 
-        <div class="tile tile-full">
+        <div class="tile tile-full" data-mod="hourly">
           <div class="tile-label">Hourly &middot; next 24h</div>
           <div id="hourly-strip" class="fstrip"></div>
         </div>
 
-        <div class="tile tile-full">
+        <div class="tile tile-full" data-mod="daily">
           <div class="tile-label">Next days</div>
           <div id="daily-strip" class="fstrip"></div>
         </div>
 
-        <div class="tile tile-full">
+        <div class="tile tile-full" data-mod="sun">
           <div class="tile-label">Sun</div>
           <div class="sunarc">
             <svg viewBox="0 0 200 92" class="sunarc-svg" preserveAspectRatio="xMidYMid meet">
@@ -193,12 +193,12 @@
           </div>
         </div>
 
-        <div class="tile tile-full">
+        <div class="tile tile-full" data-mod="precip12">
           <div class="tile-label">Rain chance &middot; next 12h</div>
           <div id="precip-strip" class="hstrip"></div>
         </div>
 
-        <div class="tile tile-full">
+        <div class="tile tile-full" data-mod="heat24">
           <div class="tile-label">Temperature &middot; next 24h</div>
           <div id="heat-strip" class="heatstrip"></div>
           <div id="heat-labels" class="heatlabels"></div>
@@ -208,6 +208,7 @@
 
       <footer class="footer">
         <span id="updated-line">&nbsp;</span>
+        <button id="customize-btn" class="linkbtn" type="button">Customize</button>
         <button id="settings-btn" class="linkbtn" type="button">Settings</button>
       </footer>
     </div>

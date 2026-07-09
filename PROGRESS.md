@@ -122,6 +122,15 @@ handling, 60s auto-refresh.
   answer to the "daily forecast" ask — served off the existing Tempest
   `better_forecast`, no NOAA/second data source needed.
 
+## Post-backlog additions
+
+- **Customize mode (module show/hide)** ✅ — a footer **Customize** button flips
+  `#dashboard` into `.editing` mode; each tile carries a `data-mod` key and gets an
+  injected **Hide/Show** toggle (`injectModuleToggles`). Hidden modules persist
+  per-device in `localStorage` (`tempest_hidden`) and are `display:none` normally,
+  but shown dimmed in edit mode so they can be re-enabled. Re-renders only touch
+  inner value nodes, so the toggle button + `mod-hidden` class survive refreshes.
+
 ## Remaining backlog
 
 **The F1–F15 backlog is fully shipped.** 🎉 The icon/forecast wave (F7–F9), the

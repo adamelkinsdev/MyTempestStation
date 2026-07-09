@@ -271,6 +271,7 @@ body {
 }
 
 .tile {
+  position: relative; /* anchor the Customize toggle button */
   background-color: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
@@ -759,3 +760,39 @@ body {
   margin-left: auto;
   margin-right: auto;
 }
+
+/* ---------- Customize mode: per-tile show/hide ---------- */
+
+/* Hidden modules vanish from the normal dashboard... */
+.mod-hidden { display: none; }
+
+/* The per-tile toggle is invisible until Customize mode is on. */
+.mod-toggle {
+  display: none;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 6;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 5px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background-color: rgba(16, 22, 29, 0.9);
+  color: #eaf1f8;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* In Customize mode: reveal toggles, and bring hidden tiles back dimmed so
+   they can be re-shown. A soft ring flags that editing is active. */
+.editing .mod-toggle { display: block; }
+.editing .tile { outline: 1px solid rgba(111, 178, 255, 0.25); }
+.editing .mod-hidden {
+  display: block;
+  opacity: 0.45;
+  outline: 1px dashed rgba(255, 255, 255, 0.4);
+}
+.editing .mod-hidden .mod-toggle { opacity: 1; }

@@ -12,6 +12,7 @@
   var HISTORY_MAX = 1500;         // ring-buffer cap (~24h at the 60s idle poll)
   var LAST_OBS_KEY = 'tempest_last_obs';       // F15: last-known payloads so the
   var LAST_FC_KEY = 'tempest_last_forecast';   // wall display paints on load
+  var HIDDEN_KEY = 'tempest_hidden';           // per-device list of hidden modules
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
   // Refresh cadence. Idle is the normal pace; Watch is a temporary fast pace for
@@ -1149,6 +1150,88 @@
     else { enterWatch(); }
   }
 
+  /* ---------- Module show/hide (Customize mode) ---------- */
+  // Each dashboard tile carries a data-mod key. The user hides/shows tiles in an
+  // edit mode; the hidden set persists per-device in localStorage. Re-renders
+  // only touch inner value nodes, so the injected toggle button + mod-hidden
+  // class on the tile survive refreshes.
+
+  function getHidden() {
+    try {
+      var raw = localStorage.getItem(HIDDEN_KEY);
+      if (!raw) { return []; }
+      var arr = JSON.parse(raw);
+      return (arr && arr.length) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function setHidden(arr) {
+    try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+  function inList(arr, v) {
+    for (var i = 0; i < arr.length; i++) { if (arr[i] === v) { return true; } }
+    return false;
+  }
+  function isModuleHidden(mod) { return inList(getHidden(), mod); }
+
+  // All tiles that opted in with a data-mod attribute.
+  function moduleTiles() {
+    var out = [];
+    var tiles = document.getElementsByClassName('tile');
+    for (var i = 0; i < tiles.length; i++) {
+      var mod = tiles[i].getAttribute ? tiles[i].getAttribute('data-mod') : null;
+      if (mod) { out.push({ el: tiles[i], mod: mod }); }
+    }
+    return out;
+  }
+
+  function applyModuleVisibility() {
+    var hidden = getHidden();
+    var list = moduleTiles();
+    for (var i = 0; i < list.length; i++) {
+      var hid = inList(hidden, list[i].mod);
+      if (hid) { addClass(list[i].el, 'mod-hidden'); } else { removeClass(list[i].el, 'mod-hidden'); }
+      var btns = list[i].el.getElementsByClassName('mod-toggle');
+      if (btns && btns[0]) { btns[0].innerHTML = hid ? 'Show' : 'Hide'; }
+    }
+  }
+
+  function setModuleHidden(mod, hide) {
+    var h = getHidden();
+    if (hide && !inList(h, mod)) { h.push(mod); }
+    else if (!hide) {
+      var next = [];
+      for (var i = 0; i < h.length; i++) { if (h[i] !== mod) { next.push(h[i]); } }
+      h = next;
+    }
+    setHidden(h);
+    applyModuleVisibility();
+  }
+
+  // Inject a Hide/Show toggle into each module tile (shown only in edit mode).
+  function injectModuleToggles() {
+    var list = moduleTiles();
+    for (var i = 0; i < list.length; i++) {
+      (function (item) {
+        var btn = document.createElement('button');
+        btn.className = 'mod-toggle';
+        btn.type = 'button';
+        btn.innerHTML = 'Hide';
+        btn.onclick = function () { setModuleHidden(item.mod, !isModuleHidden(item.mod)); };
+        item.el.appendChild(btn);
+      })(list[i]);
+    }
+    applyModuleVisibility();
+  }
+
+  function toggleEditMode() {
+    var dash = byId('dashboard');
+    if (!dash) { return; }
+    var editing = !hasClass(dash, 'editing');
+    if (editing) { addClass(dash, 'editing'); } else { removeClass(dash, 'editing'); }
+    var b = byId('customize-btn');
+    if (b) { b.innerHTML = editing ? 'Done' : 'Customize'; }
+  }
+
   /* ---------- event wiring ---------- */
 
   function trim(s) { return s ? s.replace(/^\s+|\s+$/g, '') : ''; }
@@ -1175,6 +1258,10 @@
     byId('refresh-btn').onclick = refreshAll;
     byId('watch-btn').onclick = toggleWatch;
     byId('settings-btn').onclick = onSettings;
+    byId('customize-btn').onclick = toggleEditMode;
+
+    // Customize mode: inject per-tile Hide/Show toggles and apply saved state.
+    injectModuleToggles();
 
     // Header clock: set now, then tick (minutes only, so 15s is plenty).
     updateClock();
