@@ -14,6 +14,7 @@
   var LAST_FC_KEY = 'tempest_last_forecast';   // wall display paints on load
   var HIDDEN_KEY = 'tempest_hidden';           // per-device list of hidden modules
   var COORDS_KEY = 'tempest_coords';           // station lat/lon (for AQI + alerts)
+  var PLACE_KEY = 'tempest_place';             // NWS zone/county for this location
   var LAST_AQI_KEY = 'tempest_last_aqi';       // cached Open-Meteo air-quality payload
   var LAST_ALERTS_KEY = 'tempest_last_alerts'; // cached NWS active-alerts payload
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
@@ -44,6 +45,7 @@
   var watchEndsAt = 0;      // epoch ms when watch mode auto-reverts to idle
   var sunTimes = null;      // {sr, ss} epoch seconds, for the day/night theme
   var stationCoords = null; // {lat, lon} captured from the Tempest responses
+  var stationPlace = null;  // {zone, county, city, state} from the NWS points API
   var lastAqiAt = 0;        // epoch ms of the last air-quality fetch (throttle)
   var lastAlertsAt = 0;     // epoch ms of the last NWS alerts fetch (throttle)
 
@@ -101,6 +103,16 @@
     if (la === null || lo === null) { return; }
     stationCoords = { lat: la, lon: lo };
     try { localStorage.setItem(COORDS_KEY, JSON.stringify(stationCoords)); } catch (e) {}
+  }
+
+  function loadPlace() {
+    try {
+      var raw = localStorage.getItem(PLACE_KEY);
+      if (!raw) { return null; }
+      var p = JSON.parse(raw);
+      if (p && (p.zone || p.county)) { return p; }
+    } catch (e) {}
+    return null;
   }
 
   /* ---------- screen switching ---------- */
@@ -786,6 +798,21 @@
     return out.join(', ');
   }
 
+  // The alert's areaDesc segments run parallel to geocode.UGC; pick the segment
+  // whose zone/county code matches THIS location, so a multi-zone alert shows the
+  // local area (e.g. "Southern New London") rather than a far-off zone.
+  function localArea(p) {
+    if (!stationPlace) { return ''; }
+    var codes = (p.geocode && p.geocode.UGC) || [];
+    var names = (p.areaDesc || '').split(';');
+    for (var i = 0; i < codes.length && i < names.length; i++) {
+      if (codes[i] === stationPlace.zone || codes[i] === stationPlace.county) {
+        return names[i].replace(/^\s+|\s+$/g, '');
+      }
+    }
+    return '';
+  }
+
   function renderAlerts(data) {
     var banner = byId('alerts-banner');
     if (!banner) { return; }
@@ -801,7 +828,10 @@
       seen[ev] = true;
       var rank = sevRank(p.severity);
       if (rank > topRank) { topRank = rank; }
-      items.push({ event: ev, rank: rank, expires: p.expires || p.ends, area: p.areaDesc || '' });
+      items.push({
+        event: ev, rank: rank, expires: p.expires || p.ends,
+        area: p.areaDesc || '', local: localArea(p)
+      });
     }
 
     if (!items.length) {
@@ -838,7 +868,7 @@
       var meta = document.createElement('div');
       meta.className = 'alert-meta';
       var until = fmtAlertTime(it.expires);
-      var area = firstAreas(it.area);
+      var area = it.local || firstAreas(it.area);
       var metaTxt = until ? ('Until ' + until) : '';
       if (area) { metaTxt += (metaTxt ? ' · ' : '') + area; }
       meta.textContent = metaTxt || ' ';
@@ -1152,6 +1182,7 @@
     setError('');
 
     captureCoords(data);
+    fetchPlace();
     maybeFetchAqi();
     maybeFetchAlerts();
 
@@ -1332,6 +1363,44 @@
     // NWS rejects more than 4 decimal places on the point parameter.
     return 'https://api.weather.gov/alerts/active?point=' +
       Number(lat).toFixed(4) + ',' + Number(lon).toFixed(4);
+  }
+
+  // Last path segment of an NWS URL, e.g. ".../zones/forecast/CTZ012" -> "CTZ012".
+  function lastPath(url) {
+    if (!url) { return ''; }
+    var parts = String(url).split('/');
+    return parts[parts.length - 1];
+  }
+
+  // One-time NWS "points" lookup: which forecast zone/county this location is in,
+  // so an alert can be labeled with the LOCAL area name (not the first zone in a
+  // big multi-zone list). Cached per-device; place doesn't change.
+  function fetchPlace() {
+    if (!stationCoords || stationPlace) { return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'https://api.weather.gov/points/' +
+      Number(stationCoords.lat).toFixed(4) + ',' + Number(stationCoords.lon).toFixed(4), true);
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4 || xhr.status !== 200) { return; }
+      var d = null;
+      try { d = JSON.parse(xhr.responseText); } catch (e) { return; }
+      var p = d.properties || {};
+      var rl = (p.relativeLocation && p.relativeLocation.properties) || {};
+      stationPlace = {
+        zone: lastPath(p.forecastZone),
+        county: lastPath(p.county),
+        city: rl.city || '',
+        state: rl.state || ''
+      };
+      try { localStorage.setItem(PLACE_KEY, JSON.stringify(stationPlace)); } catch (e) {}
+      // Re-label any cached alerts now that we know the local area.
+      try {
+        var al = localStorage.getItem(LAST_ALERTS_KEY);
+        if (al) { renderAlerts(JSON.parse(al)); }
+      } catch (e) {}
+    };
+    xhr.send();
   }
 
   // Best-effort like the forecast/AQI: no custom headers (a User-Agent header
@@ -1546,6 +1615,7 @@
 
   function init() {
     stationCoords = loadCoords();
+    stationPlace = loadPlace();
 
     byId('save-token').onclick = onSaveSetup;
     byId('refresh-btn').onclick = refreshAll;
