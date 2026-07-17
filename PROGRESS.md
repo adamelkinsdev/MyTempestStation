@@ -28,9 +28,14 @@ WebKit; this does. Deployed on **Firebase Hosting** at
   per-device on a setup screen and stored in that browser's `localStorage`
   (`tempest_station`, `tempest_token`). Nothing personal — no station ID, token,
   or location — lives in source.
-- **Data sources** (both always metric → converted to imperial client-side):
-  - Observations: `swd.weatherflow.com/swd/rest/observations/station/<id>?token=<t>`
-  - Forecast: `swd.weatherflow.com/swd/rest/better_forecast?station_id=<id>&token=<t>`
+- **Data sources:**
+  - Tempest observations (always metric → converted client-side):
+    `swd.weatherflow.com/swd/rest/observations/station/<id>?token=<t>`
+  - Tempest forecast: `swd.weatherflow.com/swd/rest/better_forecast?station_id=<id>&token=<t>`
+  - Air quality (US AQI): `air-quality-api.open-meteo.com/v1/air-quality?latitude=&longitude=&current=us_aqi,...`
+    — Open-Meteo, free, no key, CORS. Keyed by the station lat/lon.
+  - Weather alerts: `api.weather.gov/alerts/active?point=<lat>,<lon>` — NWS/NOAA,
+    free, no key. Must be a header-less GET (a `User-Agent` header trips CORS).
 - **License:** PolyForm Noncommercial 1.0.0 (`LICENSE`). Free for noncommercial
   use with attribution; commercial use requires a separate paid license.
 
@@ -130,6 +135,32 @@ handling, 60s auto-refresh.
   per-device in `localStorage` (`tempest_hidden`) and are `display:none` normally,
   but shown dimmed in edit mode so they can be re-enabled. Re-renders only touch
   inner value nodes, so the toggle button + `mod-hidden` class survive refreshes.
+- **Compact temperature hero** ✅ — the temp/conditions tile is now a normal
+  single tile in the metric grid (not a full-width banner); conditions icon +
+  words sit on a compact second line under the temperature.
+- **F16 ✅ Air Quality tile** — Tempest has no air sensors, so current **US AQI**
+  comes from the **Open-Meteo Air Quality API** (free, no key, CORS) queried by
+  the station's lat/lon. Shows the AQI number + EPA category + dominant pollutant
+  on a banded 0–500 marker bar (`renderAirQuality`). Throttled to 15 min
+  (`maybeFetchAqi`), cached (`tempest_last_aqi`) for instant repaint, glows on
+  unhealthy air (AQI > 150), and is hide/show-able via Customize (`data-mod="aqi"`).
+- **F17 ✅ NWS alerts banner** — official watches/warnings/advisories (flood,
+  severe storm, **air quality**, etc.) from **api.weather.gov/alerts/active**
+  (free, no key) queried by the station point. A banner above the tiles
+  (`renderAlerts`) dedupes repeated same-event alerts, sorts worst-first, colors
+  by top severity, uses `textContent` for all alert text (no markup injection),
+  throttled to 10 min (`maybeFetchAlerts`), cached (`tempest_last_alerts`), and
+  hides itself when nothing is active. **CORS note:** we send NO custom headers —
+  a `User-Agent` header would trip the NWS CORS preflight — so it stays a simple
+  cross-origin GET, exactly like the existing Tempest calls.
+
+### Air quality + alerts plumbing
+- The station's **lat/lon** is captured from the Tempest observation/forecast
+  responses (`captureCoords`) and cached per-device in `localStorage`
+  (`tempest_coords`) — like the token, no location ever lives in source. Both the
+  AQI and alerts fetches key off it. `render()` calls `captureCoords` then the
+  throttled `maybeFetchAqi`/`maybeFetchAlerts`; `init()` seeds `stationCoords`
+  from cache so a returning device fetches both immediately.
 
 ## Remaining backlog
 
