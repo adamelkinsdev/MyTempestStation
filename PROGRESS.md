@@ -154,6 +154,17 @@ handling, 60s auto-refresh.
   a `User-Agent` header would trip the NWS CORS preflight — so it stays a simple
   cross-origin GET, exactly like the existing Tempest calls.
 
+- **F18 ✅ True daily observed hi/lo** — F13's hi/lo was client-side only, so a
+  cold load showed current = high = low until history accrued. Tempest has no
+  direct "today's observed hi/lo" field, but `stats/station/<id>` returns a
+  `stats_day` array whose last row is **today** (updated through the day); each row
+  is `[date, p_avg, p_hi, p_lo, t_avg, t_HI, t_LO, …]` in metric (temp high = idx 5,
+  low = idx 6). `fetchStationStats` reads today's row and `renderObservedHiLo` now
+  **merges** it with the client-side calc — server gives the accurate all-day range
+  instantly, live readings can still push beyond it between the 15-min refreshes.
+  Cached (`tempest_today_hilo`); falls back to the client calc if today's row is
+  absent.
+
 ### Air quality + alerts plumbing
 - The station's **lat/lon** is captured from the Tempest observation/forecast
   responses (`captureCoords`) and cached per-device in `localStorage`
