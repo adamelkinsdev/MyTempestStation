@@ -13,7 +13,13 @@
   var LAST_OBS_KEY = 'tempest_last_obs';       // F15: last-known payloads so the
   var LAST_FC_KEY = 'tempest_last_forecast';   // wall display paints on load
   var HIDDEN_KEY = 'tempest_hidden';           // per-device list of hidden modules
+  var COORDS_KEY = 'tempest_coords';           // station lat/lon (for AQI + alerts)
+  var LAST_AQI_KEY = 'tempest_last_aqi';       // cached Open-Meteo air-quality payload
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
+
+  // Air quality (Open-Meteo) refreshes slowly; poll at most every 15 min even
+  // though observations tick every 60s.
+  var AQI_REFRESH_MS = 15 * 60 * 1000;
 
   // Refresh cadence. Idle is the normal pace; Watch is a temporary fast pace for
   // storm-watching that auto-relaxes back to Idle after WATCH_DURATION_MS.
@@ -35,6 +41,12 @@
   var watchTimer = null;    // 1s ticker driving the watch countdown/fallback
   var watchEndsAt = 0;      // epoch ms when watch mode auto-reverts to idle
   var sunTimes = null;      // {sr, ss} epoch seconds, for the day/night theme
+  var stationCoords = null; // {lat, lon} captured from the Tempest responses
+  var lastAqiAt = 0;        // epoch ms of the last air-quality fetch (throttle)
+
+  // Alert glows on for genuinely unhealthy air (US AQI above "Unhealthy for
+  // Sensitive Groups").
+  var ALERT_AQI = 150;
 
   function byId(id) { return document.getElementById(id); }
 
@@ -62,6 +74,30 @@
   // True only when this device has both values configured.
   function isConfigured() {
     return !!(getToken() && getStation());
+  }
+
+  /* ---------- station coordinates (for air quality + alerts) ---------- */
+  // The Tempest observation and forecast responses carry the station's lat/lon.
+  // We stash it per-device (like the token) so the client can query Open-Meteo
+  // and, later, the NWS alerts API by point — no location ever lives in source.
+
+  function loadCoords() {
+    try {
+      var raw = localStorage.getItem(COORDS_KEY);
+      if (!raw) { return null; }
+      var c = JSON.parse(raw);
+      if (c && typeof c.lat === 'number' && typeof c.lon === 'number') { return c; }
+    } catch (e) {}
+    return null;
+  }
+
+  function captureCoords(data) {
+    if (!data) { return; }
+    var la = toNum(data.latitude);
+    var lo = toNum(data.longitude);
+    if (la === null || lo === null) { return; }
+    stationCoords = { lat: la, lon: lo };
+    try { localStorage.setItem(COORDS_KEY, JSON.stringify(stationCoords)); } catch (e) {}
   }
 
   /* ---------- screen switching ---------- */
@@ -639,8 +675,75 @@
     el.innerHTML = s || '&nbsp;';
   }
 
+  /* ---------- Air quality (Open-Meteo US AQI) ---------- */
+  // Tempest hardware has no air sensors, so AQI comes from Open-Meteo (free, no
+  // key, CORS-enabled) queried by the station's lat/lon.
+
+  // Sub-AQI field -> short pollutant label, for the "dominant pollutant" note.
+  var AQI_POLL = {
+    us_aqi_pm2_5: 'PM2.5',
+    us_aqi_pm10: 'PM10',
+    us_aqi_ozone: 'Ozone',
+    us_aqi_nitrogen_dioxide: 'NO₂',
+    us_aqi_sulphur_dioxide: 'SO₂',
+    us_aqi_carbon_monoxide: 'CO'
+  };
+
+  // US EPA AQI category for a value -> label + color class.
+  function aqiCategory(aqi) {
+    if (aqi <= 50) { return { label: 'Good', cls: 'aqi-good' }; }
+    if (aqi <= 100) { return { label: 'Moderate', cls: 'aqi-mod' }; }
+    if (aqi <= 150) { return { label: 'Unhealthy for Sensitive', cls: 'aqi-usg' }; }
+    if (aqi <= 200) { return { label: 'Unhealthy', cls: 'aqi-unhealthy' }; }
+    if (aqi <= 300) { return { label: 'Very Unhealthy', cls: 'aqi-vhigh' }; }
+    return { label: 'Hazardous', cls: 'aqi-hazardous' };
+  }
+
+  function renderAirQuality(data) {
+    var valEl = byId('v-aqi');
+    var catEl = byId('v-aqi-cat');
+    var mk = byId('aqibar-marker');
+    if (!valEl || !catEl) { return; }
+
+    var cur = data && data.current;
+    var aqi = cur ? toNum(cur.us_aqi) : null;
+    if (aqi === null) {
+      valEl.innerHTML = '&mdash;';
+      valEl.className = 'tile-value';
+      catEl.innerHTML = '&nbsp;';
+      if (mk) { mk.style.display = 'none'; }
+      setAlert('tile-aqi', false);
+      return;
+    }
+
+    aqi = Math.round(aqi);
+    var c = aqiCategory(aqi);
+    valEl.innerHTML = String(aqi);
+    valEl.className = 'tile-value ' + c.cls;
+
+    // Dominant pollutant = the component whose sub-AQI drives the overall value.
+    var domKey = null, domVal = -1, k;
+    for (k in AQI_POLL) {
+      if (AQI_POLL.hasOwnProperty(k)) {
+        var v = toNum(cur[k]);
+        if (v !== null && v > domVal) { domVal = v; domKey = k; }
+      }
+    }
+    var dom = domKey ? (' &middot; ' + AQI_POLL[domKey]) : '';
+    catEl.innerHTML = '<span class="' + c.cls + '">' + c.label + '</span>' + dom;
+
+    if (mk) {
+      var posp = aqi; if (posp > 500) { posp = 500; } if (posp < 0) { posp = 0; }
+      mk.style.left = (posp / 500 * 100) + '%';
+      mk.style.display = '';
+    }
+
+    setAlert('tile-aqi', aqi > ALERT_AQI);
+  }
+
   function renderForecast(data) {
     if (!data) { return; }
+    captureCoords(data);
     renderSummary(data);
     renderConditions(data.current_conditions);
     if (!data.forecast) { return; }
@@ -778,6 +881,10 @@
     try {
       var f = localStorage.getItem(LAST_FC_KEY);
       if (f) { renderForecast(JSON.parse(f)); }
+    } catch (e) {}
+    try {
+      var a = localStorage.getItem(LAST_AQI_KEY);
+      if (a) { renderAirQuality(JSON.parse(a)); }
     } catch (e) {}
   }
 
@@ -931,6 +1038,9 @@
   function render(data) {
     setError('');
 
+    captureCoords(data);
+    maybeFetchAqi();
+
     if (data && data.station_name) {
       byId('station-name').innerHTML = data.station_name;
     }
@@ -1066,6 +1176,42 @@
       renderForecast(data);
     };
     xhr.send();
+  }
+
+  function buildAqiUrl(lat, lon) {
+    return 'https://air-quality-api.open-meteo.com/v1/air-quality' +
+      '?latitude=' + encodeURIComponent(lat) +
+      '&longitude=' + encodeURIComponent(lon) +
+      '&current=us_aqi,us_aqi_pm2_5,us_aqi_pm10,us_aqi_ozone,' +
+      'us_aqi_nitrogen_dioxide,us_aqi_sulphur_dioxide,us_aqi_carbon_monoxide' +
+      '&timezone=auto';
+  }
+
+  // Air quality is a best-effort extra: on any failure we quietly leave the tile
+  // as-is (no header-setting, so the request stays a simple CORS GET).
+  function fetchAirQuality() {
+    if (!stationCoords) { return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', buildAqiUrl(stationCoords.lat, stationCoords.lon), true);
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4 || xhr.status !== 200) { return; }
+      var data = null;
+      try { data = JSON.parse(xhr.responseText); } catch (e) { return; }
+      saveLast(LAST_AQI_KEY, data);
+      renderAirQuality(data);
+    };
+    xhr.send();
+  }
+
+  // Throttled: AQI changes hourly, so fetch at most every AQI_REFRESH_MS even
+  // though render() (which calls this) runs on every observation tick.
+  function maybeFetchAqi() {
+    if (!stationCoords) { return; }
+    var now = new Date().getTime();
+    if (now - lastAqiAt < AQI_REFRESH_MS) { return; }
+    lastAqiAt = now;
+    fetchAirQuality();
   }
 
   // Fetch current conditions and forecast together.
@@ -1254,6 +1400,8 @@
   }
 
   function init() {
+    stationCoords = loadCoords();
+
     byId('save-token').onclick = onSaveSetup;
     byId('refresh-btn').onclick = refreshAll;
     byId('watch-btn').onclick = toggleWatch;

@@ -523,6 +523,49 @@ body {
   border-radius: 2px;
 }
 
+/* ---------- Air Quality (US AQI) ---------- */
+
+/* Category text/number colors — EPA hues toned for legibility on dark slate. */
+.aqi-good { color: #5fd35f; font-weight: 600; }
+.aqi-mod { color: #e6d63c; font-weight: 600; }
+.aqi-usg { color: #ff9e3d; font-weight: 600; }
+.aqi-unhealthy { color: #ff5a5a; font-weight: 600; }
+.aqi-vhigh { color: #c77dff; font-weight: 600; }
+.aqi-hazardous { color: #e06a80; font-weight: 600; }
+
+/* Banded bar with a marker at the current AQI (segments span 0..500). */
+.aqibar { margin-top: 12px; }
+.aqibar-track {
+  position: relative;
+  height: 10px;
+  border-radius: 6px;
+  overflow: visible;
+  font-size: 0; /* kill inline-block whitespace between segments */
+}
+.aqiseg {
+  display: inline-block;
+  height: 10px;
+  vertical-align: top;
+}
+.aqiseg-good { width: 10%; background-color: #00c853; border-radius: 6px 0 0 6px; }
+.aqiseg-mod { width: 10%; background-color: #e6d63c; }
+.aqiseg-usg { width: 10%; background-color: #ff9e3d; }
+.aqiseg-unhealthy { width: 10%; background-color: #ff5252; }
+.aqiseg-vhigh { width: 20%; background-color: #9c4dcc; }
+.aqiseg-hazardous { width: 40%; background-color: #8d3b4a; border-radius: 0 6px 6px 0; }
+
+.aqibar-marker {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 4px;
+  height: 16px;
+  margin-left: -2px;
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  border-radius: 2px;
+}
+
 /* ---------- Wind compass ---------- */
 
 .wind-main {
