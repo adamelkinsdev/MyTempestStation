@@ -200,5 +200,5 @@ Verification pattern per feature: `node --check public/app.js` → run
   client-side.
 - `obs[0]` has **no** `wind_direction_cardinal` — computed from `wind_direction`.
 - `lightning_strike_count_last_3hr` is provided directly (no accumulation needed).
-- Station ID for reference during dev: **210198** (Waterford). It is NOT in
-  source — it's entered on the device and stored in localStorage.
+- The Station ID is NOT in source — it's entered on the device and stored in
+  localStorage (find yours in your tempestwx.com station URL).

@@ -174,7 +174,7 @@ watch/idle timers → clock/theme → `init()`. Add new tiles by (a) adding mark
 - **Sunrise/sunset countdown + daylight length:** enrich the existing sun arc.
 - **Season/almanac line:** daylight change vs yesterday, using sun times.
 
-## 7. API field reference (verified against station 210198)
+## 7. API field reference (verified against a live station)
 
 Values are **metric** — convert client-side (helpers exist in app.js).
 
