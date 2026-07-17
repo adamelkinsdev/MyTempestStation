@@ -15,11 +15,13 @@
   var HIDDEN_KEY = 'tempest_hidden';           // per-device list of hidden modules
   var COORDS_KEY = 'tempest_coords';           // station lat/lon (for AQI + alerts)
   var LAST_AQI_KEY = 'tempest_last_aqi';       // cached Open-Meteo air-quality payload
+  var LAST_ALERTS_KEY = 'tempest_last_alerts'; // cached NWS active-alerts payload
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
-  // Air quality (Open-Meteo) refreshes slowly; poll at most every 15 min even
-  // though observations tick every 60s.
+  // Air quality (Open-Meteo) and NWS alerts refresh slowly; poll each at most
+  // this often even though observations tick every 60s.
   var AQI_REFRESH_MS = 15 * 60 * 1000;
+  var ALERTS_REFRESH_MS = 10 * 60 * 1000;
 
   // Refresh cadence. Idle is the normal pace; Watch is a temporary fast pace for
   // storm-watching that auto-relaxes back to Idle after WATCH_DURATION_MS.
@@ -43,6 +45,7 @@
   var sunTimes = null;      // {sr, ss} epoch seconds, for the day/night theme
   var stationCoords = null; // {lat, lon} captured from the Tempest responses
   var lastAqiAt = 0;        // epoch ms of the last air-quality fetch (throttle)
+  var lastAlertsAt = 0;     // epoch ms of the last NWS alerts fetch (throttle)
 
   // Alert glows on for genuinely unhealthy air (US AQI above "Unhealthy for
   // Sensitive Groups").
@@ -741,6 +744,112 @@
     setAlert('tile-aqi', aqi > ALERT_AQI);
   }
 
+  /* ---------- Weather alerts (NWS active alerts) ---------- */
+  // Official watches/warnings/advisories (flood, severe storm, air quality, …)
+  // from the free api.weather.gov, queried by the station point. Shown in a
+  // banner above the tiles, colored by the most severe active alert.
+
+  function sevRank(s) {
+    s = (s || '').toLowerCase();
+    if (s === 'extreme') { return 4; }
+    if (s === 'severe') { return 3; }
+    if (s === 'moderate') { return 2; }
+    if (s === 'minor') { return 1; }
+    return 0; // Unknown
+  }
+  function sevClass(rank) {
+    if (rank >= 3) { return 'alert-extreme'; }
+    if (rank === 2) { return 'alert-moderate'; }
+    if (rank === 1) { return 'alert-minor'; }
+    return 'alert-unknown';
+  }
+
+  // ISO timestamp -> friendly local "h:mm AM/PM" (empty string if unparseable).
+  function fmtAlertTime(iso) {
+    if (!iso) { return ''; }
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) { return ''; }
+    var h = d.getHours(), m = d.getMinutes();
+    var ap = h >= 12 ? 'PM' : 'AM';
+    var hh = h % 12; if (hh === 0) { hh = 12; }
+    return hh + ':' + (m < 10 ? '0' : '') + m + ' ' + ap;
+  }
+
+  // NWS areaDesc is a long "A; B; C; …" list; show the first couple for context.
+  function firstAreas(s) {
+    if (!s) { return ''; }
+    var parts = s.split(';'), out = [];
+    for (var i = 0; i < parts.length && out.length < 2; i++) {
+      var t = parts[i].replace(/^\s+|\s+$/g, '');
+      if (t) { out.push(t); }
+    }
+    return out.join(', ');
+  }
+
+  function renderAlerts(data) {
+    var banner = byId('alerts-banner');
+    if (!banner) { return; }
+
+    var feats = (data && data.features) || [];
+    var seen = {}, items = [], topRank = -1, i;
+    for (i = 0; i < feats.length; i++) {
+      var p = feats[i].properties || {};
+      if (p.status && p.status !== 'Actual') { continue; }
+      if (p.messageType === 'Cancel') { continue; }
+      var ev = p.event || 'Weather Alert';
+      if (seen[ev]) { continue; } // collapse repeated same-event alerts
+      seen[ev] = true;
+      var rank = sevRank(p.severity);
+      if (rank > topRank) { topRank = rank; }
+      items.push({ event: ev, rank: rank, expires: p.expires || p.ends, area: p.areaDesc || '' });
+    }
+
+    if (!items.length) {
+      banner.style.display = 'none';
+      banner.className = 'alerts-banner';
+      banner.innerHTML = '';
+      return;
+    }
+
+    items.sort(function (a, b) { return b.rank - a.rank; }); // worst first
+
+    // Build via DOM + textContent so alert text can never inject markup.
+    banner.innerHTML = '';
+    banner.className = 'alerts-banner ' + sevClass(topRank);
+
+    var head = document.createElement('div');
+    head.className = 'alerts-head';
+    head.innerHTML = '&#9888; '; // warning triangle (static markup)
+    var hs = document.createElement('span');
+    hs.textContent = items.length === 1 ? '1 active alert' : (items.length + ' active alerts');
+    head.appendChild(hs);
+    banner.appendChild(head);
+
+    for (i = 0; i < items.length; i++) {
+      var it = items[i];
+      var row = document.createElement('div');
+      row.className = 'alert-item ' + sevClass(it.rank);
+
+      var evEl = document.createElement('div');
+      evEl.className = 'alert-event';
+      evEl.textContent = it.event;
+      row.appendChild(evEl);
+
+      var meta = document.createElement('div');
+      meta.className = 'alert-meta';
+      var until = fmtAlertTime(it.expires);
+      var area = firstAreas(it.area);
+      var metaTxt = until ? ('Until ' + until) : '';
+      if (area) { metaTxt += (metaTxt ? ' · ' : '') + area; }
+      meta.textContent = metaTxt || ' ';
+      row.appendChild(meta);
+
+      banner.appendChild(row);
+    }
+
+    banner.style.display = '';
+  }
+
   function renderForecast(data) {
     if (!data) { return; }
     captureCoords(data);
@@ -885,6 +994,10 @@
     try {
       var a = localStorage.getItem(LAST_AQI_KEY);
       if (a) { renderAirQuality(JSON.parse(a)); }
+    } catch (e) {}
+    try {
+      var al = localStorage.getItem(LAST_ALERTS_KEY);
+      if (al) { renderAlerts(JSON.parse(al)); }
     } catch (e) {}
   }
 
@@ -1040,6 +1153,7 @@
 
     captureCoords(data);
     maybeFetchAqi();
+    maybeFetchAlerts();
 
     if (data && data.station_name) {
       byId('station-name').innerHTML = data.station_name;
@@ -1212,6 +1326,37 @@
     if (now - lastAqiAt < AQI_REFRESH_MS) { return; }
     lastAqiAt = now;
     fetchAirQuality();
+  }
+
+  function buildAlertsUrl(lat, lon) {
+    // NWS rejects more than 4 decimal places on the point parameter.
+    return 'https://api.weather.gov/alerts/active?point=' +
+      Number(lat).toFixed(4) + ',' + Number(lon).toFixed(4);
+  }
+
+  // Best-effort like the forecast/AQI: no custom headers (a User-Agent header
+  // would trip NWS's CORS preflight), so this stays a simple cross-origin GET.
+  function fetchAlerts() {
+    if (!stationCoords) { return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', buildAlertsUrl(stationCoords.lat, stationCoords.lon), true);
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4 || xhr.status !== 200) { return; }
+      var data = null;
+      try { data = JSON.parse(xhr.responseText); } catch (e) { return; }
+      saveLast(LAST_ALERTS_KEY, data);
+      renderAlerts(data);
+    };
+    xhr.send();
+  }
+
+  function maybeFetchAlerts() {
+    if (!stationCoords) { return; }
+    var now = new Date().getTime();
+    if (now - lastAlertsAt < ALERTS_REFRESH_MS) { return; }
+    lastAlertsAt = now;
+    fetchAlerts();
   }
 
   // Fetch current conditions and forecast together.

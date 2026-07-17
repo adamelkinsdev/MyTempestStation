@@ -259,6 +259,56 @@ body {
   margin-bottom: 16px;
 }
 
+/* ---------- Weather alerts banner (NWS) ---------- */
+
+.alerts-banner {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-left-width: 4px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.alerts-head {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #eaf1f8;
+  margin-bottom: 4px;
+}
+
+.alert-item { margin-top: 6px; }
+
+.alert-event {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.alert-meta {
+  font-size: 12px;
+  color: #a9bdd1;
+  margin-top: 1px;
+}
+
+/* Banner tint + accent driven by the most severe active alert. */
+.alerts-banner.alert-extreme { border-left-color: #ff5252; background-color: rgba(255, 82, 82, 0.10); }
+.alerts-banner.alert-moderate { border-left-color: #ff9e3d; background-color: rgba(255, 158, 61, 0.10); }
+.alerts-banner.alert-minor { border-left-color: #e6d63c; background-color: rgba(230, 214, 60, 0.10); }
+.alerts-banner.alert-unknown { border-left-color: #6fb2ff; background-color: rgba(111, 178, 255, 0.10); }
+
+/* Per-alert event color by that alert's own severity. */
+.alert-item.alert-extreme .alert-event { color: #ff7a7a; }
+.alert-item.alert-moderate .alert-event { color: #ffb066; }
+.alert-item.alert-minor .alert-event { color: #e6d63c; }
+.alert-item.alert-unknown .alert-event { color: #9fc7ff; }
+
+@media (min-width: 760px) {
+  .alerts-head { font-size: 15px; }
+  .alert-event { font-size: 16px; }
+  .alert-meta { font-size: 13px; }
+}
+
 /* ---------- Tiles (flex-wrap, margin-based gutters) ---------- */
 
 .tiles {
