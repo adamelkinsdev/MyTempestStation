@@ -17,12 +17,15 @@
   var PLACE_KEY = 'tempest_place';             // NWS zone/county for this location
   var LAST_AQI_KEY = 'tempest_last_aqi';       // cached Open-Meteo air-quality payload
   var LAST_ALERTS_KEY = 'tempest_last_alerts'; // cached NWS active-alerts payload
+  var TODAY_HILO_KEY = 'tempest_today_hilo';   // server-side observed daily hi/lo
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
-  // Air quality (Open-Meteo) and NWS alerts refresh slowly; poll each at most
-  // this often even though observations tick every 60s.
+  // Air quality (Open-Meteo), NWS alerts, and the Tempest daily-stats hi/lo all
+  // refresh slowly; poll each at most this often even though observations tick
+  // every 60s.
   var AQI_REFRESH_MS = 15 * 60 * 1000;
   var ALERTS_REFRESH_MS = 10 * 60 * 1000;
+  var STATS_REFRESH_MS = 15 * 60 * 1000;
 
   // Refresh cadence. Idle is the normal pace; Watch is a temporary fast pace for
   // storm-watching that auto-relaxes back to Idle after WATCH_DURATION_MS.
@@ -48,6 +51,8 @@
   var stationPlace = null;  // {zone, county, city, state} from the NWS points API
   var lastAqiAt = 0;        // epoch ms of the last air-quality fetch (throttle)
   var lastAlertsAt = 0;     // epoch ms of the last NWS alerts fetch (throttle)
+  var lastStatsAt = 0;      // epoch ms of the last daily-stats fetch (throttle)
+  var todayHiLo = null;     // {date:'YYYY-MM-DD', hi, lo} observed hi/lo in °F
 
   // Alert glows on for genuinely unhealthy air (US AQI above "Unhealthy for
   // Sensitive Groups").
@@ -113,6 +118,23 @@
       if (p && (p.zone || p.county)) { return p; }
     } catch (e) {}
     return null;
+  }
+
+  function loadTodayHiLo() {
+    try {
+      var raw = localStorage.getItem(TODAY_HILO_KEY);
+      if (!raw) { return null; }
+      var t = JSON.parse(raw);
+      if (t && t.date) { return t; }
+    } catch (e) {}
+    return null;
+  }
+
+  // Local calendar date as "YYYY-MM-DD" (to match Tempest's stats_day day key).
+  function localDateStr(d) {
+    d = d || new Date();
+    var m = d.getMonth() + 1, day = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
   }
 
   /* ---------- screen switching ---------- */
@@ -1110,6 +1132,13 @@
       if (lo === null || tf < lo) { lo = tf; }
       if (hi === null || tf > hi) { hi = tf; }
     }
+    // Merge the server-side daily hi/lo (accurate for the whole day, not just
+    // since this browser started tracking). Live client readings can still push
+    // beyond it between the 15-min stats refreshes.
+    if (todayHiLo && todayHiLo.date === localDateStr()) {
+      if (todayHiLo.hi !== null && (hi === null || todayHiLo.hi > hi)) { hi = todayHiLo.hi; }
+      if (todayHiLo.lo !== null && (lo === null || todayHiLo.lo < lo)) { lo = todayHiLo.lo; }
+    }
     if (lo === null) { el.innerHTML = '&nbsp;'; return; }
     el.innerHTML = 'Today <span class="hilo-hi">&uarr;' + Math.round(hi) + '&deg;</span> ' +
       '<span class="hilo-lo">&darr;' + Math.round(lo) + '&deg;</span>';
@@ -1185,6 +1214,7 @@
     fetchPlace();
     maybeFetchAqi();
     maybeFetchAlerts();
+    maybeFetchStats();
 
     if (data && data.station_name) {
       byId('station-name').innerHTML = data.station_name;
@@ -1428,6 +1458,52 @@
     fetchAlerts();
   }
 
+  function buildStatsUrl(token, station) {
+    return 'https://swd.weatherflow.com/swd/rest/stats/station/' +
+      encodeURIComponent(station) + '?token=' + encodeURIComponent(token);
+  }
+
+  // Tempest has no "today's observed hi/lo" field, but the daily-stats endpoint
+  // returns a stats_day array whose last row is TODAY (updated through the day).
+  // Each row is [date, p_avg, p_hi, p_lo, t_avg, t_HI, t_LO, ...] in metric.
+  function fetchStationStats() {
+    var token = getToken();
+    var station = getStation();
+    if (!token || !station) { return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', buildStatsUrl(token, station), true);
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4 || xhr.status !== 200) { return; }
+      var d = null;
+      try { d = JSON.parse(xhr.responseText); } catch (e) { return; }
+      var days = (d && d.stats_day) || [];
+      var today = localDateStr();
+      var row = null;
+      for (var i = days.length - 1; i >= 0; i--) {
+        if (days[i] && days[i][0] === today) { row = days[i]; break; }
+      }
+      if (!row) { return; }
+      var hiC = toNum(row[5]), loC = toNum(row[6]);
+      if (hiC === null && loC === null) { return; }
+      todayHiLo = {
+        date: today,
+        hi: hiC === null ? null : cToF(hiC),
+        lo: loC === null ? null : cToF(loC)
+      };
+      try { localStorage.setItem(TODAY_HILO_KEY, JSON.stringify(todayHiLo)); } catch (e) {}
+      renderObservedHiLo();
+    };
+    xhr.send();
+  }
+
+  function maybeFetchStats() {
+    var now = new Date().getTime();
+    if (now - lastStatsAt < STATS_REFRESH_MS) { return; }
+    lastStatsAt = now;
+    fetchStationStats();
+  }
+
   // Fetch current conditions and forecast together.
   function refreshAll() {
     fetchData();
@@ -1616,6 +1692,7 @@
   function init() {
     stationCoords = loadCoords();
     stationPlace = loadPlace();
+    todayHiLo = loadTodayHiLo();
 
     byId('save-token').onclick = onSaveSetup;
     byId('refresh-btn').onclick = refreshAll;
