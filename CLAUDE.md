@@ -1,8 +1,9 @@
 # CLAUDE.md
 
 Guidance for working on this repo. This file is a **map + rules**, not a feature
-list — for the running feature log and detailed API field reference, see the
-source-of-truth docs at the bottom.
+list. For what any feature does, read the code in `public/app.js` or just look at
+the running dashboard — those are the source of truth; this file is only the
+durable "how to work here" guide.
 
 ## What this is
 
@@ -94,13 +95,7 @@ firebase deploy --only hosting
 Test harnesses live in the session scratchpad (not committed) and drive the real
 `app.js` through a stubbed document/localStorage/XHR, then assert on the fake DOM —
 run with `APP_JS=<abs path to public/app.js> node <harness>.js`. Recreate them if
-the scratchpad is gone; the stub pattern is described in PROGRESS.md.
+the scratchpad is gone.
 
 Working cadence: build one feature at a time, then `node --check` → regression
 harness → deploy → commit + push per feature.
-
-## Sources of truth (read these; keep them, not this file, detailed)
-
-- **`PROGRESS.md`** — architecture, every shipped feature (F1…), refresh behavior,
-  and the deploy/test workflow. Update it when you ship.
-- **`SUGGESTED_FEATURES.md`** — backlog ideas + a verified Tempest API field reference.
