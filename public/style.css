@@ -286,9 +286,6 @@ body {
     width: -webkit-calc(50% - 12px);
     width: calc(50% - 12px);
   }
-  .tile-hero {
-    width: 100%;
-  }
 }
 
 .tile-label {
@@ -310,22 +307,24 @@ body {
   display: -webkit-box;
   display: -webkit-flex;
   display: flex;
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
   -webkit-box-align: center;
   -webkit-align-items: center;
   align-items: center;
 }
 .hero-temp {
-  font-size: 52px;
+  font-size: 44px;
   font-weight: 600;
   line-height: 1;
-  margin-right: 18px;
+  margin-right: 14px;
 }
 .hero-meta .tile-label { margin-bottom: 3px; }
 
-/* F7 current-conditions: icon + words pushed to the right of the temp tile. */
+/* F7 current-conditions: icon + words on a compact line under the temperature. */
 .hero-cond {
-  margin-left: auto;
-  padding-left: 14px;
+  width: 100%;
+  margin-top: 8px;
   display: -webkit-box;
   display: -webkit-flex;
   display: flex;
@@ -335,15 +334,14 @@ body {
 }
 .hero-cond-icon {
   display: inline-block;
-  margin-right: 10px;
+  margin-right: 8px;
 }
-.hero-cond-icon svg { display: block; }
+.hero-cond-icon svg { display: block; width: 36px; height: 36px; }
 .hero-cond-text {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   line-height: 1.15;
   color: #dce8f4;
-  max-width: 110px;
 }
 
 .tile-sub {
@@ -720,22 +718,24 @@ body {
     padding: 22px;
   }
 
-  /* 2 metric tiles per row; hero + forecast strips still span the full width. */
+  /* 3 metric tiles per row; the temp hero is now a normal tile too, so only
+     the full-width forecast strips still span the whole row. */
   .tile {
-    width: -webkit-calc(50% - 12px);
-    width: calc(50% - 12px);
+    width: -webkit-calc(33.333% - 12px);
+    width: calc(33.333% - 12px);
   }
-  .tile-hero,
   .tile-full {
     width: 100%;
   }
 
-  /* A little more presence for the headline temperature on the big screen. */
-  .hero-temp { font-size: 60px; }
+  /* A little more presence for the headline temperature on the big screen,
+     but sized to fit the temp hero now that it's a normal-width tile. */
+  .hero-temp { font-size: 50px; }
 
-  /* Bump the conditions icon + words to read from across the room. */
-  .hero-cond-icon svg { width: 80px; height: 80px; }
-  .hero-cond-text { font-size: 21px; max-width: 150px; }
+  /* Conditions icon + words sit on the hero's second line; keep them legible
+     without blowing out the narrower tile. */
+  .hero-cond-icon svg { width: 40px; height: 40px; }
+  .hero-cond-text { font-size: 18px; }
 
   /* Roomier hourly + daily cells and bigger icons on the wide wall view. */
   .fcell { width: 62px; margin-right: 8px; }
