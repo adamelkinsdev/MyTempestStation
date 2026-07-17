@@ -720,10 +720,10 @@ body {
     padding: 22px;
   }
 
-  /* 3 metric tiles per row; hero + forecast strips still span the full width. */
+  /* 2 metric tiles per row; hero + forecast strips still span the full width. */
   .tile {
-    width: -webkit-calc(33.333% - 12px);
-    width: calc(33.333% - 12px);
+    width: -webkit-calc(50% - 12px);
+    width: calc(50% - 12px);
   }
   .tile-hero,
   .tile-full {
