@@ -88,6 +88,10 @@ npx serve public
 # Syntax check
 node --check public/app.js
 
+# Lint (ES5 rules matching the iOS 10.3.3 constraint — see .jshintrc)
+npm install   # one time, dev-only tooling
+npm run lint
+
 # Deploy (Firebase already authenticated as the owner)
 firebase deploy --only hosting
 ```

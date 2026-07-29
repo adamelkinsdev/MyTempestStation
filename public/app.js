@@ -69,10 +69,6 @@
   function setToken(t) {
     try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {}
   }
-  function clearToken() {
-    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
-  }
-
   function getStation() {
     try { return localStorage.getItem(STATION_KEY); }
     catch (e) { return null; }
@@ -1241,17 +1237,17 @@
     byId('v-gust').innerHTML = fmt(o.wind_gust, mpsToMph, 1, ' mph');
 
     var card = o.wind_direction_cardinal || cardinal(o.wind_direction);
-    var deg = (o.wind_direction === null || o.wind_direction === undefined)
-      ? '' : (' ' + Math.round(Number(o.wind_direction)) + '&deg;');
+    var deg = (o.wind_direction === null || o.wind_direction === undefined) ?
+      '' : (' ' + Math.round(Number(o.wind_direction)) + '&deg;');
     byId('v-winddir').innerHTML = card ? (card + deg) : (deg || '&mdash;');
 
     renderWindBar(mpsToMphN(o.wind_avg), mpsToMphN(o.wind_gust), mpsToMphN(o.wind_lull));
     renderCompass(toNum(o.wind_direction));
 
     // Prefer sea-level pressure; fall back to station/barometric pressure.
-    var pressure = (o.sea_level_pressure !== undefined && o.sea_level_pressure !== null)
-      ? o.sea_level_pressure
-      : (o.barometric_pressure !== undefined ? o.barometric_pressure : o.station_pressure);
+    var pressure = (o.sea_level_pressure !== undefined && o.sea_level_pressure !== null) ?
+      o.sea_level_pressure :
+      (o.barometric_pressure !== undefined ? o.barometric_pressure : o.station_pressure);
     byId('v-pressure').innerHTML = fmt(pressure, mbToInHg, 2, ' inHg');
     renderPressureTrend(o.pressure_trend);
 

@@ -1,0 +1,9 @@
+{
+  "esversion": 5,
+  "browser": true,
+  "undef": true,
+  "unused": true,
+  "strict": true,
+  "loopfunc": true,
+  "predef": ["localStorage", "XMLHttpRequest"]
+}

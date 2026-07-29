@@ -1,0 +1,11 @@
+{
+  "name": "my-tempest-station",
+  "private": true,
+  "description": "Lint tooling only — the shipped app in public/ is dependency-free with no build step.",
+  "scripts": {
+    "lint": "jshint public/app.js"
+  },
+  "devDependencies": {
+    "jshint": "^2.13.6"
+  }
+}
