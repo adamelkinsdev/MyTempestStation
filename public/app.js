@@ -20,12 +20,13 @@
   var TODAY_HILO_KEY = 'tempest_today_hilo';   // server-side observed daily hi/lo
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
-  // Air quality (Open-Meteo), NWS alerts, and the Tempest daily-stats hi/lo all
-  // refresh slowly; poll each at most this often even though observations tick
-  // every 60s.
+  // Air quality (Open-Meteo), NWS alerts, the Tempest daily-stats hi/lo, and the
+  // NWS radar loop image all refresh slowly; poll/reload each at most this often
+  // even though observations tick every 60s.
   var AQI_REFRESH_MS = 15 * 60 * 1000;
   var ALERTS_REFRESH_MS = 10 * 60 * 1000;
   var STATS_REFRESH_MS = 15 * 60 * 1000;
+  var RADAR_REFRESH_MS = 5 * 60 * 1000; // NWS composites update roughly this often
 
   // Refresh cadence. Idle is the normal pace; Watch is a temporary fast pace for
   // storm-watching that auto-relaxes back to Idle after WATCH_DURATION_MS.
@@ -52,6 +53,7 @@
   var lastAqiAt = 0;        // epoch ms of the last air-quality fetch (throttle)
   var lastAlertsAt = 0;     // epoch ms of the last NWS alerts fetch (throttle)
   var lastStatsAt = 0;      // epoch ms of the last daily-stats fetch (throttle)
+  var lastRadarAt = 0;      // epoch ms of the last radar image reload (throttle)
   var todayHiLo = null;     // {date:'YYYY-MM-DD', hi, lo} observed hi/lo in °F
 
   // Alert glows on for genuinely unhealthy air (US AQI above "Unhealthy for
@@ -1211,6 +1213,7 @@
     maybeFetchAqi();
     maybeFetchAlerts();
     maybeFetchStats();
+    maybeRadarMap();
 
     if (data && data.station_name) {
       byId('station-name').innerHTML = data.station_name;
@@ -1401,8 +1404,11 @@
   // One-time NWS "points" lookup: which forecast zone/county this location is in,
   // so an alert can be labeled with the LOCAL area name (not the first zone in a
   // big multi-zone list). Cached per-device; place doesn't change.
+  // Re-fetch when there's no cached place yet, OR the cached place predates the
+  // radarStation field (a one-time migration for devices that cached place data
+  // before the radar tile existed) — otherwise this place lookup never changes.
   function fetchPlace() {
-    if (!stationCoords || stationPlace) { return; }
+    if (!stationCoords || (stationPlace && stationPlace.radarStation)) { return; }
     var xhr = new XMLHttpRequest();
     xhr.open('GET', 'https://api.weather.gov/points/' +
       Number(stationCoords.lat).toFixed(4) + ',' + Number(stationCoords.lon).toFixed(4), true);
@@ -1417,7 +1423,8 @@
         zone: lastPath(p.forecastZone),
         county: lastPath(p.county),
         city: rl.city || '',
-        state: rl.state || ''
+        state: rl.state || '',
+        radarStation: p.radarStation ? String(p.radarStation) : ''
       };
       try { localStorage.setItem(PLACE_KEY, JSON.stringify(stationPlace)); } catch (e) {}
       // Re-label any cached alerts now that we know the local area.
@@ -1425,6 +1432,7 @@
         var al = localStorage.getItem(LAST_ALERTS_KEY);
         if (al) { renderAlerts(JSON.parse(al)); }
       } catch (e) {}
+      renderRadarMap();
     };
     xhr.send();
   }
@@ -1452,6 +1460,48 @@
     if (now - lastAlertsAt < ALERTS_REFRESH_MS) { return; }
     lastAlertsAt = now;
     fetchAlerts();
+  }
+
+  /* ---------- Radar map (NWS RIDGE loop GIF) ---------- */
+  // Tempest's free API has no radar/map imagery (that's the commercial
+  // TempestOne tier). NWS publishes a free, no-key, public-domain radar loop
+  // GIF per NEXRAD site, and the /points lookup above (fetchPlace) already
+  // gives us the nearest site as `radarStation` — so this is a single <img>,
+  // no JS map library, no CDN, no extra API call. US NEXRAD coverage only; the
+  // tile shows a placeholder message where that isn't available.
+
+  var RADAR_SITE_RE = /^[A-Za-z0-9]{3,4}$/; // defensive: validate before it goes in a URL
+
+  function buildRadarMapUrl(site) {
+    // Cache-busting bucket in RADAR_REFRESH_MS-wide steps: forces a reload on
+    // schedule without minting a new unique URL on every 60s observation tick.
+    var bucket = Math.floor(new Date().getTime() / RADAR_REFRESH_MS);
+    return 'https://radar.weather.gov/ridge/standard/' + encodeURIComponent(site) + '_loop.gif?t=' + bucket;
+  }
+
+  function renderRadarMap() {
+    var img = byId('v-radarmap');
+    var cap = byId('v-radarmap-cap');
+    if (!img) { return; }
+    var site = stationPlace && stationPlace.radarStation;
+    if (!site || !RADAR_SITE_RE.test(site)) {
+      img.style.display = 'none';
+      if (cap) { cap.innerHTML = 'No NWS radar site for this location'; }
+      return;
+    }
+    img.style.display = '';
+    img.src = buildRadarMapUrl(site);
+    if (cap) { cap.innerHTML = 'NWS radar &middot; ' + site; }
+  }
+
+  // Throttled reload so a fast poll (or Watch mode) doesn't hammer NWS; the
+  // radar composite itself only updates on this rough cadence anyway.
+  function maybeRadarMap() {
+    if (!stationPlace || !stationPlace.radarStation) { return; }
+    var now = new Date().getTime();
+    if (now - lastRadarAt < RADAR_REFRESH_MS) { return; }
+    lastRadarAt = now;
+    renderRadarMap();
   }
 
   function buildStatsUrl(token, station) {
@@ -1689,6 +1739,7 @@
     stationCoords = loadCoords();
     stationPlace = loadPlace();
     todayHiLo = loadTodayHiLo();
+    renderRadarMap(); // instant paint from the last-known radar site, like renderCached()
 
     byId('save-token').onclick = onSaveSetup;
     byId('refresh-btn').onclick = refreshAll;

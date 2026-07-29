@@ -681,6 +681,15 @@ body {
   .tile-full { width: 100%; }
 }
 
+/* Radar map (NWS RIDGE loop GIF) */
+.radarmap-wrap {
+  margin-top: 4px;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.04);
+}
+.radarmap-img { display: block; width: 100%; height: auto; }
+
 /* Sun arc */
 .sunarc { margin-top: 4px; }
 .sunarc-svg { display: block; width: 100%; height: auto; }
