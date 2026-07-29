@@ -1407,8 +1407,12 @@
   // Re-fetch when there's no cached place yet, OR the cached place predates the
   // radarStation field (a one-time migration for devices that cached place data
   // before the radar tile existed) — otherwise this place lookup never changes.
+  // NOTE: guard on the KEY being present, not its truthiness — a location outside
+  // NEXRAD coverage legitimately caches radarStation as '' (falsy), and checking
+  // truthiness there would re-fire this fetch on every render() forever instead
+  // of once.
   function fetchPlace() {
-    if (!stationCoords || (stationPlace && stationPlace.radarStation)) { return; }
+    if (!stationCoords || (stationPlace && stationPlace.radarStation !== undefined)) { return; }
     var xhr = new XMLHttpRequest();
     xhr.open('GET', 'https://api.weather.gov/points/' +
       Number(stationCoords.lat).toFixed(4) + ',' + Number(stationCoords.lon).toFixed(4), true);
