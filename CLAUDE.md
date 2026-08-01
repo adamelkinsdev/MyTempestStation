@@ -75,7 +75,13 @@ Verify with `node --check public/app.js` (syntax) — but the real test is the i
 - **Nothing personal in source:** no token, station ID, coordinates, or location.
   The token + station id are entered on the device and live only in that browser's
   `localStorage`; lat/lon and NWS zone are derived at runtime and cached per-device.
-- `.gitignore` already blocks `*token*.txt`, `*.token`, `.env*`, and `.claude/`.
+- `.gitignore` already blocks `*token*.txt`, `*.token`, `.env*`, `secrets.json`,
+  and `.claude/`. Two ignored files exist locally and must stay untracked:
+  `secrets.json` (Firebase service-account key) and `.env` (`APP_TOKEN`,
+  `APP_STATION_ID`, `APP_URL`, `FIREBASE_PROJECT_ID`).
+- **`.env` does not configure the dashboard.** There is no build step, so nothing
+  injects it into `public/` — the app still reads the token + station id from the
+  Settings screen into `localStorage`. `.env` is for harnesses and scripts only.
 - Don't paste real tokens/IDs into committed files, docs, or test fixtures. Test
   harnesses take the token via an env var (`APP_TOKEN`) — never hardcode it.
 
@@ -92,9 +98,16 @@ node --check public/app.js
 npm install   # one time, dev-only tooling
 npm run lint
 
-# Deploy (Firebase already authenticated as the owner)
-firebase deploy --only hosting
+# Deploy — auth comes from the git-ignored service-account key, not `firebase login`
+GOOGLE_APPLICATION_CREDENTIALS=./secrets.json firebase deploy --only hosting
 ```
+
+The Firebase CLI is **not** a repo dependency — install it once with
+`npm install -g firebase-tools`. There is no interactive login on this machine
+(`firebase login:list` reports no authorized accounts); `secrets.json` in the repo
+root is the service-account key and every `firebase` command needs the
+`GOOGLE_APPLICATION_CREDENTIALS` prefix above. Hosting serves `public/` only, so
+`secrets.json` and `.env` are never part of a deploy.
 
 Test harnesses live in the session scratchpad (not committed) and drive the real
 `app.js` through a stubbed document/localStorage/XHR, then assert on the fake DOM —
