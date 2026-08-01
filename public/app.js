@@ -1466,46 +1466,145 @@
     fetchAlerts();
   }
 
-  /* ---------- Radar map (NWS RIDGE loop GIF) ---------- */
+  /* ---------- Radar map (NWS RIDGE frames, animated in JS) ---------- */
   // Tempest's free API has no radar/map imagery (that's the commercial
-  // TempestOne tier). NWS publishes a free, no-key, public-domain radar loop
-  // GIF per NEXRAD site, and the /points lookup above (fetchPlace) already
-  // gives us the nearest site as `radarStation` — so this is a single <img>,
-  // no JS map library, no CDN, no extra API call. US NEXRAD coverage only; the
-  // tile shows a placeholder message where that isn't available.
+  // TempestOne tier). NWS publishes free, no-key, public-domain radar images
+  // per NEXRAD site, and the /points lookup above (fetchPlace) already gives us
+  // the nearest site as `radarStation` — so this is a single <img>, no JS map
+  // library, no CDN, no extra API call. US NEXRAD coverage only; the tile shows
+  // a placeholder message where that isn't available.
+  //
+  // We step through the ten single-frame images (SITE_0..SITE_9) on a timer
+  // rather than pointing the <img> at the ready-made SITE_loop.gif, because:
+  // the GIF's own cycle is 3.3s for ~18 minutes of weather (too fast to read),
+  // some viewers pause animated GIFs outright (OS reduce-motion settings, and
+  // Firefox's image.animation_mode), and per-frame control lets us caption each
+  // frame with how old it is. Frames are newest-first (_0) and land ~2 min
+  // apart, so a full pass covers roughly 18 minutes.
+  //
+  // radar.weather.gov sends no CORS headers, so JS can't read each frame's
+  // Last-Modified — the caption ages frames off the fixed cadence instead.
 
   var RADAR_SITE_RE = /^[A-Za-z0-9]{3,4}$/; // defensive: validate before it goes in a URL
+  var RADAR_FRAMES = 10;         // NWS publishes SITE_0 (newest) .. SITE_9 (oldest)
+  var RADAR_FRAME_GAP_MIN = 2;   // real-world minutes between consecutive frames
+  var RADAR_STEP_MS = 500;       // playback dwell on an ordinary frame
+  var RADAR_HOLD_MS = 1500;      // longer dwell on the newest frame, to mark the wrap
 
-  function buildRadarMapUrl(site) {
-    // Cache-busting bucket in RADAR_REFRESH_MS-wide steps: forces a reload on
-    // schedule without minting a new unique URL on every 60s observation tick.
-    var bucket = Math.floor(new Date().getTime() / RADAR_REFRESH_MS);
-    return 'https://radar.weather.gov/ridge/standard/' + encodeURIComponent(site) + '_loop.gif?t=' + bucket;
+  var radarPlay = [];        // preloaded frames in playback order: [{img, age}], oldest first
+  var radarIdx = 0;          // index into radarPlay of the frame on screen
+  var radarTimer = null;     // setTimeout handle driving playback
+  var radarSite = '';        // site radarPlay belongs to
+  var radarLoading = false;  // a frame set is in flight; don't stack another
+
+  function buildRadarFrameUrl(site, frame, bucket) {
+    return 'https://radar.weather.gov/ridge/standard/' + encodeURIComponent(site) +
+      '_' + frame + '.gif?t=' + bucket;
+  }
+
+  function radarStop() {
+    if (radarTimer) { clearTimeout(radarTimer); radarTimer = null; }
+  }
+
+  function radarCaption(text) {
+    var cap = byId('v-radarmap-cap');
+    if (cap) { cap.textContent = text; }
+  }
+
+  function radarShow(i) {
+    var img = byId('v-radarmap');
+    var f = radarPlay[i];
+    if (!img || !f) { return; }
+    img.src = f.img.src; // already cached by the preload, so this paints without a fetch
+    radarCaption('NWS radar · ' + radarSite + ' · ' +
+      (f.age === 0 ? 'now' : '-' + (f.age * RADAR_FRAME_GAP_MIN) + ' min'));
+  }
+
+  function radarTick() {
+    var n = radarPlay.length;
+    if (!n) { radarTimer = null; return; }
+    if (radarIdx >= n) { radarIdx = 0; }
+    radarShow(radarIdx);
+    var newest = (radarIdx === n - 1);
+    radarIdx = newest ? 0 : radarIdx + 1;
+    radarTimer = setTimeout(radarTick, newest ? RADAR_HOLD_MS : RADAR_STEP_MS);
+  }
+
+  // Preload the whole set before playing any of it: every swap in radarShow()
+  // then comes from cache, instead of flashing blank on a slow connection. The
+  // frames already on screen keep looping until the new set is ready.
+  function radarLoadFrames(site) {
+    if (radarLoading) { return; }
+    radarLoading = true;
+    lastRadarAt = new Date().getTime();
+    // Cache-busting bucket in RADAR_REFRESH_MS-wide steps, matching the reload
+    // throttle: fresh images each scheduled reload, cache hits in between.
+    var bucket = Math.floor(lastRadarAt / RADAR_REFRESH_MS);
+    var batch = [];
+    var pending = RADAR_FRAMES;
+
+    function settled() {
+      pending--;
+      if (pending > 0) { return; }
+      radarLoading = false;
+      // A site can publish fewer than ten frames; keep whichever decoded and
+      // play them oldest -> newest, holding each frame's real age for the caption.
+      var ok = [];
+      for (var j = RADAR_FRAMES - 1; j >= 0; j--) {
+        if (batch[j].naturalWidth) { ok.push({ img: batch[j], age: j }); }
+      }
+      var img = byId('v-radarmap');
+      if (!ok.length) {
+        radarStop();
+        radarPlay = [];
+        radarSite = '';
+        if (img) { img.style.display = 'none'; }
+        radarCaption('Radar image unavailable');
+        return;
+      }
+      radarStop();
+      radarPlay = ok;
+      radarSite = site;
+      radarIdx = 0;
+      if (img) { img.style.display = ''; }
+      radarTick();
+    }
+
+    for (var i = 0; i < RADAR_FRAMES; i++) {
+      var pre = new Image();
+      pre.onload = settled;
+      pre.onerror = settled; // naturalWidth stays 0, so settled() drops it
+      pre.src = buildRadarFrameUrl(site, i, bucket);
+      batch.push(pre);
+    }
   }
 
   function renderRadarMap() {
     var img = byId('v-radarmap');
-    var cap = byId('v-radarmap-cap');
     if (!img) { return; }
     var site = stationPlace && stationPlace.radarStation;
     if (!site || !RADAR_SITE_RE.test(site)) {
+      radarStop();
+      radarPlay = [];
+      radarSite = '';
       img.style.display = 'none';
-      if (cap) { cap.innerHTML = 'No NWS radar site for this location'; }
+      radarCaption('No NWS radar site for this location');
       return;
     }
-    img.style.display = '';
-    img.src = buildRadarMapUrl(site);
-    if (cap) { cap.innerHTML = 'NWS radar &middot; ' + site; }
+    // render* fns run on every refresh and on cached replay; once this site's
+    // frames are playing, leave the loop alone. maybeRadarMap() does reloads.
+    if (radarSite === site && radarPlay.length) { return; }
+    if (!radarLoading) { radarCaption('NWS radar · loading…'); }
+    radarLoadFrames(site);
   }
 
   // Throttled reload so a fast poll (or Watch mode) doesn't hammer NWS; the
   // radar composite itself only updates on this rough cadence anyway.
   function maybeRadarMap() {
-    if (!stationPlace || !stationPlace.radarStation) { return; }
-    var now = new Date().getTime();
-    if (now - lastRadarAt < RADAR_REFRESH_MS) { return; }
-    lastRadarAt = now;
-    renderRadarMap();
+    var site = stationPlace && stationPlace.radarStation;
+    if (!site || !RADAR_SITE_RE.test(site)) { return; }
+    if (new Date().getTime() - lastRadarAt < RADAR_REFRESH_MS) { return; }
+    radarLoadFrames(site);
   }
 
   function buildStatsUrl(token, station) {

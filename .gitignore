@@ -13,6 +13,7 @@ tempesttoken.txt
 *.token
 .env
 .env.*
+secrets.json
 
 # Claude Code local settings
 .claude/
