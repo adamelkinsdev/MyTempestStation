@@ -9,8 +9,8 @@ durable "how to work here" guide.
 
 A dependency-free static weather dashboard for one personal **WeatherFlow Tempest**
 station, built to run in **Safari on iOS 10.3.3** (an old iPad wall display). It's
-three static files served by Firebase Hosting. There is **no build step** — what
-you write in `public/` is what ships.
+a handful of static files served by Firebase Hosting. There is **no build step** —
+what you write in `public/` is what ships.
 
 ## The one non-negotiable rule: iOS 10.3.3 / Safari 10 compatibility
 
@@ -39,6 +39,9 @@ Verify with `node --check public/app.js` (syntax) — but the real test is the i
 - `public/app.js` — **all** logic, in one IIFE. Roughly ordered: constants/state →
   helpers → per-feature `render*()` fns → `fetch*()` fns → refresh/watch loop →
   Customize mode → `init()`.
+- `docs/` — reference notes, not shipped. `tempest-api-guide.md` is the Tempest API
+  cheat-sheet (endpoints, payload shapes, units); read it before guessing at a
+  Tempest response.
 
 ## Patterns to follow (match the surrounding code)
 
@@ -69,6 +72,16 @@ Verify with `node --check public/app.js` (syntax) — but the real test is the i
   free, no key, keyed off the station lat/lon captured from Tempest responses.
 - **NWS CORS gotcha:** send **no custom headers** — a `User-Agent` header trips the
   NWS CORS preflight. Plain header-less GETs (what we do everywhere) work fine.
+- **NWS radar imagery** (`radar.weather.gov/ridge/standard/`): ten single-frame GIFs
+  per site, `SITE_0` (newest) .. `SITE_9`, ~2 min apart. Unlike `api.weather.gov` it
+  sends **no CORS headers at all**, so JS can't XHR it or read `Last-Modified` —
+  `<img>` loads only, and frame ages come from the fixed cadence. Filenames are
+  positional (`_0` becomes `_1` two minutes later), so older frames can't be kept.
+- **Don't ship an animated GIF as the only motion cue.** The radar tile used to
+  point at the ready-made `SITE_loop.gif`; some viewers pause animated GIFs outright
+  (OS reduce-motion, Firefox's `image.animation_mode`), and in calm weather the only
+  thing changing between frames is the timestamp in the corner — so it reads as
+  broken. We step frames in JS and caption each with its age instead.
 
 ## Secrets / privacy — the repo is PUBLIC
 
@@ -102,12 +115,10 @@ npm run lint
 GOOGLE_APPLICATION_CREDENTIALS=./secrets.json firebase deploy --only hosting
 ```
 
-The Firebase CLI is **not** a repo dependency — install it once with
-`npm install -g firebase-tools`. There is no interactive login on this machine
-(`firebase login:list` reports no authorized accounts); `secrets.json` in the repo
-root is the service-account key and every `firebase` command needs the
-`GOOGLE_APPLICATION_CREDENTIALS` prefix above. Hosting serves `public/` only, so
-`secrets.json` and `.env` are never part of a deploy.
+The Firebase CLI is **not** a repo dependency — install it once with `npm install -g
+firebase-tools`. There's no interactive login on this machine, so **every** `firebase`
+command needs that `GOOGLE_APPLICATION_CREDENTIALS` prefix. Hosting serves `public/`
+only, so `secrets.json` and `.env` are never part of a deploy.
 
 Test harnesses live in the session scratchpad (not committed) and drive the real
 `app.js` through a stubbed document/localStorage/XHR, then assert on the fake DOM —
