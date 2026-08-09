@@ -616,6 +616,19 @@ body {
   border-radius: 2px;
 }
 
+/* ---------- Station health (battery) ---------- */
+
+.batt-ok { color: #7fdca0; font-weight: 600; }
+.batt-low { color: #e6d63c; font-weight: 600; }
+.batt-bad { color: #ff5a5a; font-weight: 600; }
+
+/* Secondary detail line (firmware / last report) — quieter than .tile-sub. */
+.tile-muted {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #7f96ac;
+}
+
 /* ---------- Wind compass ---------- */
 
 .wind-main {
