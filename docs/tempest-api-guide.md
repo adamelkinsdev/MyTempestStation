@@ -130,6 +130,11 @@ After connecting, send JSON control messages. Key rules: open only **one** conne
 // Stop
 { "type": "listen_stop", "device_id": 12345, "id": "any-request-id" }
 
+// Start/stop the ~3s rapid-wind feed (SEPARATE subscription from listen_start —
+// note the word order: listen_RAPID_start, not listen_start_rapid)
+{ "type": "listen_rapid_start", "device_id": 12345, "id": "any-request-id" }
+{ "type": "listen_rapid_stop", "device_id": 12345, "id": "any-request-id" }
+
 // Subscribe to lightning strikes in a geographic bounding box
 {
   "type": "geo_strike_listen_start",
