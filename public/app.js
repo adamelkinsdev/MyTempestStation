@@ -44,6 +44,23 @@
   var ALERT_TEMP_F = 34;
   var ALERT_LIGHTNING_MI = 10;
 
+  // Wet bulb globe temperature bands (°F). These are the common WBGT "flag"
+  // guidance thresholds used by OSHA/NWS-style heat-stress charts — advisory
+  // only, not a standard we certify against.
+  var WBGT_MODERATE_F = 76;
+  var WBGT_HIGH_F = 81;
+  var WBGT_VERY_HIGH_F = 84;
+  var WBGT_EXTREME_F = 86;
+  var WBGT_QUIET_F = 65;   // below this, heat stress isn't a story — show the number only
+  var ALERT_WBGT_F = WBGT_EXTREME_F; // glow the tile in the Extreme band
+
+  // Solar radiation bands (W/m²). Clear midday summer sun peaks near 1000;
+  // heavy overcast sits under ~200 and night is ~0.
+  var SOLAR_WEAK = 50;
+  var SOLAR_MODERATE = 200;
+  var SOLAR_STRONG = 500;
+  var SOLAR_INTENSE = 800;
+
   var refreshTimer = null;  // periodic data refresh
   var watchTimer = null;    // 1s ticker driving the watch countdown/fallback
   var watchEndsAt = 0;      // epoch ms when watch mode auto-reverts to idle
@@ -309,6 +326,10 @@
     var tf = tc === null ? null : cToF(tc);
     setAlert('tile-temp', tf !== null && tf <= ALERT_TEMP_F);
 
+    var wbgtC = toNum(o.wet_bulb_globe_temperature);
+    var wbgtF = wbgtC === null ? null : cToF(wbgtC);
+    setAlert('tile-heat', wbgtF !== null && wbgtF >= ALERT_WBGT_F);
+
     // Lightning only alerts for a genuinely recent strike (< 3h) within range.
     var distKm = toNum(o.lightning_strike_last_distance);
     var distMi = distKm === null ? null : kmToMi(distKm);
@@ -359,6 +380,67 @@
     byId('v-uv-cat').innerHTML = uv === null ? '&nbsp;' : uvCategory(uv);
     var marker = byId('uvbar-marker');
     if (marker) { marker.style.left = pct(uv, 11) + '%'; }
+  }
+
+  /* ---------- Heat safety (WBGT) + solar radiation ---------- */
+  // Both come free with every observation we already poll — no extra API call.
+  // Tempest reports them metric (°C, W/m²), so convert like everything else.
+
+  // WBGT (°F) -> flag-band label + color class. Below WBGT_QUIET_F the metric
+  // says nothing useful, so callers show the bare number with no verdict word.
+  function wbgtCategory(f) {
+    if (f < WBGT_MODERATE_F) { return { label: 'Low', cls: 'heat-low' }; }
+    if (f < WBGT_HIGH_F) { return { label: 'Moderate', cls: 'heat-mod' }; }
+    if (f < WBGT_VERY_HIGH_F) { return { label: 'High', cls: 'heat-high' }; }
+    if (f < WBGT_EXTREME_F) { return { label: 'Very High', cls: 'heat-vhigh' }; }
+    return { label: 'Extreme', cls: 'heat-extreme' };
+  }
+
+  function renderHeatSafety(o) {
+    var valEl = byId('v-wbgt');
+    var catEl = byId('v-wbgt-cat');
+    var wbEl = byId('v-wetbulb');
+    if (!valEl || !catEl) { return; }
+
+    var wbgtC = toNum(o.wet_bulb_globe_temperature);
+    // Older firmware / partial payloads simply omit these fields: leave the
+    // value as an em-dash and blank the sub-lines rather than inventing text.
+    if (wbgtC === null) {
+      valEl.innerHTML = '&mdash;';
+      valEl.className = 'tile-value';
+      catEl.innerHTML = '&nbsp;';
+    } else {
+      var wbgtF = cToF(wbgtC);
+      var c = wbgtCategory(wbgtF);
+      var quiet = wbgtF < WBGT_QUIET_F;
+      valEl.innerHTML = Math.round(wbgtF) + '&deg;';
+      valEl.className = quiet ? 'tile-value' : ('tile-value ' + c.cls);
+      catEl.innerHTML = quiet ? 'WBGT'
+        : ('WBGT &middot; <span class="' + c.cls + '">' + c.label + '</span>');
+    }
+
+    if (wbEl) {
+      wbEl.innerHTML = (toNum(o.wet_bulb_temperature) === null) ? '&nbsp;'
+        : ('Wet bulb ' + fmt(o.wet_bulb_temperature, cToF, 0, '&deg;'));
+    }
+  }
+
+  // Solar radiation (W/m²) -> plain-English strength word.
+  function solarWord(w) {
+    if (w < SOLAR_WEAK) { return 'Dark'; }
+    if (w < SOLAR_MODERATE) { return 'Weak'; }
+    if (w < SOLAR_STRONG) { return 'Moderate'; }
+    if (w < SOLAR_INTENSE) { return 'Strong'; }
+    return 'Intense';
+  }
+
+  // Sub-line of the UV tile: same sun, measured as energy rather than burn risk.
+  function renderSolar(raw) {
+    var el = byId('v-solar');
+    if (!el) { return; }
+    var w = toNum(raw);
+    if (w === null) { el.innerHTML = '&nbsp;'; return; }
+    el.innerHTML = 'Sun ' + Math.round(w) + ' W/m&sup2; &middot; ' + solarWord(w);
   }
 
   /* ---------- Wind compass (rotating SVG needle) ---------- */
@@ -1256,6 +1338,8 @@
 
     renderRain(o);
     renderUV(o.uv);
+    renderSolar(o.solar_radiation);
+    renderHeatSafety(o);
     renderLightning(o);
     applyAlerts(o);
 

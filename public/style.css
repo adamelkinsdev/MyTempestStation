@@ -436,6 +436,13 @@ body {
 .comfort-mid { color: #f2d648; font-weight: 600; }
 .comfort-bad { color: #ff9e6b; font-weight: 600; }
 
+/* WBGT flag bands — same idea as the comfort words, five steps instead of three. */
+.heat-low { color: #7fdca0; font-weight: 600; }
+.heat-mod { color: #f2d648; font-weight: 600; }
+.heat-high { color: #f59d3c; font-weight: 600; }
+.heat-vhigh { color: #ff7a59; font-weight: 600; }
+.heat-extreme { color: #ff5a5a; font-weight: 600; }
+
 .trend-up { color: #7fdca0; font-weight: 600; }
 .trend-down { color: #ff9e6b; font-weight: 600; }
 .trend-flat { color: #9fb3c8; font-weight: 600; }
