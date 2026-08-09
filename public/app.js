@@ -18,7 +18,16 @@
   var LAST_AQI_KEY = 'tempest_last_aqi';       // cached Open-Meteo air-quality payload
   var LAST_ALERTS_KEY = 'tempest_last_alerts'; // cached NWS active-alerts payload
   var TODAY_HILO_KEY = 'tempest_today_hilo';   // server-side observed daily hi/lo
+  var DEVICE_KEY = 'tempest_device_id';        // Tempest sensor device_id (history backfill)
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
+
+  // F16: history backfill. The ring buffer only grows while this browser is
+  // open, so a fresh device (or an overnight gap) starts with empty sparklines.
+  // We seed it once from the device-observations endpoint instead of waiting
+  // hours for the 60s poll to fill it in.
+  var BACKFILL_WINDOW_SEC = 24 * 3600; // how far back to ask for (HISTORY_MAX is ~25h at 60s)
+  var BACKFILL_GAP_SEC = 10 * 60;      // only backfill when the tail is older than this
+  var BACKFILL_RETRY_MS = 60 * 60 * 1000; // and at most once an hour per session
 
   // Air quality (Open-Meteo), NWS alerts, the Tempest daily-stats hi/lo, and the
   // NWS radar loop image all refresh slowly; poll/reload each at most this often
@@ -71,6 +80,8 @@
   var lastAlertsAt = 0;     // epoch ms of the last NWS alerts fetch (throttle)
   var lastStatsAt = 0;      // epoch ms of the last daily-stats fetch (throttle)
   var lastRadarAt = 0;      // epoch ms of the last radar image reload (throttle)
+  var lastBackfillAt = 0;   // epoch ms of the last history-backfill attempt (throttle)
+  var backfillBusy = false; // a backfill (or its device lookup) is in flight
   var todayHiLo = null;     // {date:'YYYY-MM-DD', hi, lo} observed hi/lo in °F
 
   // Alert glows on for genuinely unhealthy air (US AQI above "Unhealthy for
@@ -133,6 +144,22 @@
       if (p && (p.zone || p.county)) { return p; }
     } catch (e) {}
     return null;
+  }
+
+  // The Tempest sensor's device_id, discovered once from the station metadata and
+  // cached per-device like the coords/place above. Only the history backfill needs
+  // it — everything else on the dashboard is station-level.
+  function loadDeviceId() {
+    try {
+      var raw = localStorage.getItem(DEVICE_KEY);
+      if (!raw) { return null; }
+      return toNum(raw);
+    } catch (e) {}
+    return null;
+  }
+
+  function saveDeviceId(id) {
+    try { localStorage.setItem(DEVICE_KEY, String(id)); } catch (e) {}
   }
 
   function loadTodayHiLo() {
@@ -1104,6 +1131,29 @@
     saveHistory(hist);
   }
 
+  // Merge a batch of tuples (from the backfill) into the buffer: skip timestamps we
+  // already hold, keep it sorted ascending, and re-apply the ring-buffer cap.
+  // Returns true when anything was actually added, so callers can skip a repaint.
+  function mergeHistory(rows) {
+    if (!rows || !rows.length) { return false; }
+    var hist = loadHistory();
+    var seen = {}, i;
+    for (i = 0; i < hist.length; i++) { seen[hist[i][0]] = true; }
+    var added = 0;
+    for (i = 0; i < rows.length; i++) {
+      var ts = rows[i][0];
+      if (ts === null || seen[ts]) { continue; }
+      seen[ts] = true;
+      hist.push(rows[i]);
+      added++;
+    }
+    if (!added) { return false; }
+    hist.sort(function (a, b) { return a[0] - b[0]; });
+    if (hist.length > HISTORY_MAX) { hist = hist.slice(hist.length - HISTORY_MAX); }
+    saveHistory(hist);
+    return true;
+  }
+
   /* ---------- F15: last-known payload cache ---------- */
   // iOS 10.3.3 has no Service Worker, so we can't truly cache offline. Instead we
   // stash the last successful obs + forecast JSON in localStorage and repaint it
@@ -1296,6 +1346,7 @@
     maybeFetchAlerts();
     maybeFetchStats();
     maybeRadarMap();
+    maybeBackfillHistory();
 
     if (data && data.station_name) {
       byId('station-name').innerHTML = data.station_name;
@@ -1735,6 +1786,151 @@
     if (now - lastStatsAt < STATS_REFRESH_MS) { return; }
     lastStatsAt = now;
     fetchStationStats();
+  }
+
+  /* ---------- F16: history backfill (device observations) ---------- */
+  // The ring buffer only grows while this browser is open, so a fresh device — or
+  // one that was asleep overnight — draws empty sparklines and an empty wind rose
+  // for hours. The device-level observations endpoint serves the same readings we
+  // poll, but historically, so we seed the buffer once from it.
+  //
+  // Station-level endpoints don't expose a device_id, so this needs a one-time
+  // metadata lookup first (cached like the coords/place). Everything here is
+  // best-effort: any failure leaves the buffer exactly as it was.
+
+  function buildStationMetaUrl(token, station) {
+    return 'https://swd.weatherflow.com/swd/rest/stations/' + encodeURIComponent(station) +
+      '?token=' + encodeURIComponent(token);
+  }
+
+  function buildDeviceObsUrl(token, deviceId, start, end) {
+    return 'https://swd.weatherflow.com/swd/rest/observations/?device_id=' +
+      encodeURIComponent(deviceId) +
+      '&time_start=' + start + '&time_end=' + end +
+      '&token=' + encodeURIComponent(token);
+  }
+
+  // A station lists every device attached to it: the Tempest sensor ("ST" /
+  // serial "ST-…"), the hub ("HB-"), and any legacy AIR/SKY units ("AR-"/"SK-").
+  // Only the Tempest reports the obs we mirror, so match on it and skip the rest.
+  function pickTempestDevice(data) {
+    var stations = (data && data.stations) || [];
+    for (var i = 0; i < stations.length; i++) {
+      var devs = stations[i].devices || [];
+      for (var j = 0; j < devs.length; j++) {
+        var d = devs[j] || {};
+        var type = d.device_type ? String(d.device_type) : '';
+        var serial = d.serial_number ? String(d.serial_number) : '';
+        if (type === 'ST' || serial.indexOf('ST-') === 0) {
+          var id = toNum(d.device_id);
+          if (id !== null) { return id; }
+        }
+      }
+    }
+    return null;
+  }
+
+  function fetchDeviceId(cb) {
+    var token = getToken();
+    var station = getStation();
+    if (!token || !station) { backfillBusy = false; return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', buildStationMetaUrl(token, station), true);
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) { return; }
+      if (xhr.status !== 200) { backfillBusy = false; return; }
+      var d = null;
+      try { d = JSON.parse(xhr.responseText); } catch (e) { backfillBusy = false; return; }
+      var id = pickTempestDevice(d);
+      if (id === null) { backfillBusy = false; return; }
+      saveDeviceId(id);
+      cb(id);
+    };
+    xhr.send();
+  }
+
+  // Device observations are positional arrays (the obs_st layout, see
+  // docs/tempest-api-guide.md §6): 0 ts, 2 wind avg m/s, 4 wind dir deg,
+  // 6 STATION pressure mb, 7 air temp C — always metric, like everything Tempest.
+  //
+  // Pressure caveat: recordHistory() prefers the station endpoint's derived
+  // sea_level_pressure, which device obs don't carry; index 6 is raw station
+  // pressure, lower by a fixed station-altitude offset. We store it anyway rather
+  // than leaving a hole — the pressure sparkline auto-scales to its own min/max, so
+  // the shape still reads, and the one-time step where backfilled rows meet live
+  // ones ages out of the 6h window on its own.
+  function deviceObsToTuple(row) {
+    if (!row || row.length < 8) { return null; }
+    var ts = toNum(row[0]);
+    if (ts === null) { return null; }
+    var dir = toNum(row[4]);
+    return [
+      ts,
+      round1(toNum(row[7])),
+      round1(toNum(row[6])),
+      dir === null ? null : Math.round(dir),
+      round1(toNum(row[2]))
+    ];
+  }
+
+  // Epoch second to backfill FROM, or null when the buffer's tail is already
+  // current (the normal case — a reload minutes after the last poll).
+  function backfillStart() {
+    var now = Math.floor(new Date().getTime() / 1000);
+    var oldest = now - BACKFILL_WINDOW_SEC;
+    var hist = loadHistory();
+    if (!hist.length) { return oldest; }
+    var last = toNum(hist[hist.length - 1][0]);
+    if (last === null) { return oldest; }
+    if (now - last < BACKFILL_GAP_SEC) { return null; }
+    // Partial buffer: only ask for the missing tail, not the whole window.
+    return last > oldest ? last : oldest;
+  }
+
+  function fetchHistoryBackfill(deviceId) {
+    var token = getToken();
+    var start = backfillStart();
+    if (!token || deviceId === null || start === null) { backfillBusy = false; return; }
+    var end = Math.floor(new Date().getTime() / 1000);
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', buildDeviceObsUrl(token, deviceId, start, end), true);
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) { return; }
+      backfillBusy = false;
+      if (xhr.status !== 200) { return; }
+      var d = null;
+      try { d = JSON.parse(xhr.responseText); } catch (e) { return; }
+      var rows = (d && d.obs) || [];
+      var tuples = [];
+      for (var i = 0; i < rows.length; i++) {
+        var t = deviceObsToTuple(rows[i]);
+        if (t) { tuples.push(t); }
+      }
+      // Never merge more than the buffer can hold; keep the newest.
+      if (tuples.length > HISTORY_MAX) { tuples = tuples.slice(tuples.length - HISTORY_MAX); }
+      if (!mergeHistory(tuples)) { return; }
+      renderTrends();
+      renderObservedHiLo();
+      renderWindRose();
+    };
+    xhr.send();
+  }
+
+  // Runs from render() like the other maybe* throttles, but almost always no-ops:
+  // it needs a real gap at the tail of the buffer, and won't retry for an hour.
+  function maybeBackfillHistory() {
+    if (backfillBusy || !getToken()) { return; }
+    var now = new Date().getTime();
+    if (lastBackfillAt && now - lastBackfillAt < BACKFILL_RETRY_MS) { return; }
+    if (backfillStart() === null) { return; }
+    lastBackfillAt = now;
+    backfillBusy = true;
+    var id = loadDeviceId();
+    if (id !== null) { fetchHistoryBackfill(id); }
+    else { fetchDeviceId(fetchHistoryBackfill); }
   }
 
   // Fetch current conditions and forecast together.
