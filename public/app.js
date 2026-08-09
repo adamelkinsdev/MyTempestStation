@@ -18,8 +18,9 @@
   var LAST_AQI_KEY = 'tempest_last_aqi';       // cached Open-Meteo air-quality payload
   var LAST_ALERTS_KEY = 'tempest_last_alerts'; // cached NWS active-alerts payload
   var TODAY_HILO_KEY = 'tempest_today_hilo';   // server-side observed daily hi/lo
-  var DEVICE_KEY = 'tempest_device_id';        // Tempest sensor device_id (backfill + WebSocket)
+  var DEVICE_KEY = 'tempest_device_id';        // Tempest sensor device_id (backfill/WebSocket/health)
   var LAST_RECORDS_KEY = 'tempest_records';    // month/year records mined from stats
+  var LAST_HEALTH_KEY = 'tempest_last_health'; // cached battery/health summary
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
   // F16: history backfill. The ring buffer only grows while this browser is
@@ -36,6 +37,7 @@
   var AQI_REFRESH_MS = 15 * 60 * 1000;
   var ALERTS_REFRESH_MS = 10 * 60 * 1000;
   var STATS_REFRESH_MS = 15 * 60 * 1000;
+  var HEALTH_REFRESH_MS = 30 * 60 * 1000; // battery drifts over days, not minutes
   var RADAR_REFRESH_MS = 5 * 60 * 1000; // NWS composites update roughly this often
 
   // Refresh cadence. Idle is the normal pace; Watch is a temporary fast pace for
@@ -88,7 +90,7 @@
   var lastBackfillAt = 0;   // epoch ms of the last history-backfill attempt (throttle)
   var backfillBusy = false; // a backfill (or its device lookup) is in flight
   var todayHiLo = null;     // {date:'YYYY-MM-DD', hi, lo} observed hi/lo in °F
-  var stationDevice = null; // Tempest sensor device_id (cached, for the WebSocket)
+  var stationDevice = null; // Tempest sensor device_id (cached; WebSocket + health)
   var deviceLookupBusy = false; // one in-flight device_id discovery at a time
   var ws = null;            // the Watch-mode WebSocket (at most one, ever)
   var wsWanted = false;     // true only between enterWatch() and exitWatch()
@@ -96,6 +98,7 @@
   var wsReqId = 0;          // request ids for the WebSocket control messages
   var liveGustMph = null;   // last full-observation gust/lull, so a rapid-wind
   var liveLullMph = null;   // repaint keeps the wind bar's other markers
+  var lastHealthAt = 0;     // epoch ms of the last station-health fetch (throttle)
 
   // Alert glows on for genuinely unhealthy air (US AQI above "Unhealthy for
   // Sensitive Groups").
@@ -1213,6 +1216,10 @@
       if (al) { renderAlerts(JSON.parse(al)); }
     } catch (e) {}
     renderRecords(loadRecords());
+    try {
+      var h = localStorage.getItem(LAST_HEALTH_KEY);
+      if (h) { renderHealth(JSON.parse(h)); }
+    } catch (e) {}
   }
 
   /* ---------- F11/F12: sparklines from history ---------- */
@@ -1514,6 +1521,7 @@
     maybeFetchAqi();
     maybeFetchAlerts();
     maybeFetchStats();
+    maybeFetchHealth();
     maybeRadarMap();
     maybeBackfillHistory();
 
@@ -2140,6 +2148,109 @@
     else { fetchDeviceId(fetchHistoryBackfill); }
   }
 
+  /* ---------- Station health (Tempest battery) ---------- */
+  // A dying battery shows up long before the data stops arriving, so surface it.
+  // The station-level observation carries no battery field — battery volts live
+  // in the raw DEVICE observation array (obs_st index 16, see docs/tempest-api-
+  // guide.md). So: discover the Tempest sensor's device_id once from the stations
+  // endpoint (its serial starts "ST-"; the hub is "HB-", legacy units "AR-"/"SK-"),
+  // cache it, then poll that device's latest observation on a slow cadence.
+  //
+  // Thresholds are APPROXIMATE community values — WeatherFlow publishes no spec.
+  // A healthy Tempest floats near 2.6-2.8V; around 2.455V it starts shedding
+  // reporting features as the solar panel falls behind, and below ~2.41V it is
+  // heading for a shutdown.
+  var BATTERY_OK_V = 2.455;
+  var BATTERY_LOW_V = 2.41;
+  var BATTERY_MIN_V = 1.0;   // sanity bounds: a reading outside these is treated
+  var BATTERY_MAX_V = 4.0;   // as missing rather than rendered
+
+  function batteryState(v) {
+    if (v >= BATTERY_OK_V) { return { word: 'OK', cls: 'batt-ok' }; }
+    if (v >= BATTERY_LOW_V) { return { word: 'Low', cls: 'batt-low' }; }
+    return { word: 'Replace/charge soon', cls: 'batt-bad' };
+  }
+
+  // h: {volts, ts, fw}. Anything missing or out of bounds paints an empty tile
+  // rather than a wrong one.
+  function renderHealth(h) {
+    var valEl = byId('v-battery');
+    var stEl = byId('v-battery-state');
+    var metaEl = byId('v-health-meta');
+    if (!valEl || !stEl) { return; }
+
+    var v = h ? toNum(h.volts) : null;
+    if (v === null || v < BATTERY_MIN_V || v > BATTERY_MAX_V) {
+      valEl.innerHTML = '&mdash;';
+      stEl.className = 'tile-sub';
+      stEl.innerHTML = '&nbsp;';
+      if (metaEl) { metaEl.innerHTML = '&nbsp;'; }
+      setAlert('tile-health', false);
+      return;
+    }
+
+    var st = batteryState(v);
+    valEl.textContent = v.toFixed(2) + ' V';
+    stEl.className = 'tile-sub ' + st.cls;
+    stEl.textContent = 'Battery ' + st.word;
+
+    if (metaEl) {
+      var ts = toNum(h.ts);
+      if (ts !== null && ts > 0) { metaEl.textContent = 'reported ' + fmtAgo(ts); }
+      else { metaEl.innerHTML = '&nbsp;'; }
+    }
+
+    setAlert('tile-health', v < BATTERY_LOW_V);
+  }
+
+  // No time range on this endpoint = the device's latest observation. Distinct
+  // from buildDeviceObsUrl above, which asks for a historical range.
+  function buildDeviceLatestUrl(token, deviceId) {
+    return 'https://swd.weatherflow.com/swd/rest/observations/?device_id=' +
+      encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(token);
+  }
+
+  // Best-effort like the other extras: any failure leaves the tile as-is. Uses
+  // the shared device_id discovery (fetchDeviceId, above).
+  function fetchStationHealth() {
+    var token = getToken();
+    if (!token || !stationDevice) { return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', buildDeviceLatestUrl(token, stationDevice), true);
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4 || xhr.status !== 200) { return; }
+      var d = null;
+      try { d = JSON.parse(xhr.responseText); } catch (e) { return; }
+      var obs = (d && d.obs) || [];
+      var row = null;
+      // Newest row last; index 16 is battery volts in the obs_st array.
+      for (var i = obs.length - 1; i >= 0; i--) {
+        if (obs[i] && obs[i].length > 16) { row = obs[i]; break; }
+      }
+      if (!row) { return; }
+      var volts = toNum(row[16]);
+      if (volts === null) { return; }
+      var health = { volts: volts, ts: toNum(row[0]) };
+      saveLast(LAST_HEALTH_KEY, health);
+      renderHealth(health);
+    };
+    xhr.send();
+  }
+
+  function maybeFetchHealth() {
+    if (!getToken() || !getStation()) { return; }
+    var now = new Date().getTime();
+    if (now - lastHealthAt < HEALTH_REFRESH_MS) { return; }
+    lastHealthAt = now; // set before the request so a failure retries on the next
+                        // window rather than on every observation tick
+    if (!stationDevice) { stationDevice = loadDeviceId(); }
+    if (stationDevice) { fetchStationHealth(); return; }
+    fetchDeviceId(function (id) {
+      if (id !== null) { fetchStationHealth(); }
+    });
+  }
+
   // Fetch current conditions and forecast together.
   function refreshAll() {
     fetchData();
@@ -2473,6 +2584,7 @@
     stationCoords = loadCoords();
     stationPlace = loadPlace();
     todayHiLo = loadTodayHiLo();
+    stationDevice = loadDeviceId();
     renderRadarMap(); // instant paint from the last-known radar site, like renderCached()
 
     byId('save-token').onclick = onSaveSetup;
