@@ -1679,20 +1679,29 @@
     return null;
   }
 
-  // cb(deviceId) runs once, with null when discovery failed.
+  // cb(deviceId) runs once, with null when discovery failed. Several features
+  // (Watch WebSocket, history backfill, station health) can ask during the same
+  // render tick, so callbacks queue onto one in-flight lookup rather than the
+  // late askers being failed with null — that used to burn the backfill's
+  // hourly retry window on every cold start.
+  var deviceIdCbs = [];
   function fetchDeviceId(cb) {
     var token = getToken();
     var station = getStation();
-    if (!token || !station || deviceLookupBusy) { cb(null); return; }
+    if (!token || !station) { cb(null); return; }
+    deviceIdCbs.push(cb);
+    if (deviceLookupBusy) { return; }
     deviceLookupBusy = true;
 
-    // A timeout can also surface as readyState 4 / status 0, so fire cb once.
+    // A timeout can also surface as readyState 4 / status 0, so fire cbs once.
     var done = false;
     function finish(id) {
       if (done) { return; }
       done = true;
       deviceLookupBusy = false;
-      cb(id);
+      var cbs = deviceIdCbs;
+      deviceIdCbs = [];
+      for (var i = 0; i < cbs.length; i++) { cbs[i](id); }
     }
 
     var xhr = new XMLHttpRequest();
