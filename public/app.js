@@ -19,6 +19,7 @@
   var LAST_ALERTS_KEY = 'tempest_last_alerts'; // cached NWS active-alerts payload
   var TODAY_HILO_KEY = 'tempest_today_hilo';   // server-side observed daily hi/lo
   var DEVICE_KEY = 'tempest_device_id';        // Tempest sensor device_id (history backfill)
+  var LAST_RECORDS_KEY = 'tempest_records';    // month/year records mined from stats
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
   // F16: history backfill. The ring buffer only grows while this browser is
@@ -1181,6 +1182,7 @@
       var al = localStorage.getItem(LAST_ALERTS_KEY);
       if (al) { renderAlerts(JSON.parse(al)); }
     } catch (e) {}
+    renderRecords(loadRecords());
   }
 
   /* ---------- F11/F12: sparklines from history ---------- */
@@ -1333,6 +1335,143 @@
       '<text x="50" y="95" text-anchor="middle" font-size="8" fill="#7f96ac">S</text>' +
       '<text x="11" y="53" text-anchor="middle" font-size="8" fill="#7f96ac">W</text>' +
       '</svg>';
+  }
+
+  /* ---------- Records (mined from the station-stats payload) ---------- */
+  // Zero extra API calls: the 15-minute stats poll already returns stats_day,
+  // one row per day for the station's whole history. We fold those rows into
+  // month/year totals and extremes here.
+  //
+  // Column map: the API docs table for stats_day is 0-based over the NUMERIC
+  // columns only, but every row we actually receive is prefixed with the local
+  // day string — so each documented index is shifted by +1 below. That shift is
+  // what puts temp high/low on 5/6, the pair this app has used in production
+  // since the daily hi/lo shipped, which is the cross-check for the whole map.
+  // Only stats_day's layout is documented, so stats_month/stats_year are
+  // deliberately NOT parsed — everything is aggregated from the daily rows.
+  var SD_DATE = 0;           // "YYYY-MM-DD" (local day)
+  var SD_TEMP_HI = 5;        // docs idx 4  · °C
+  var SD_TEMP_LO = 6;        // docs idx 5  · °C
+  var SD_GUST = 20;          // docs idx 19 · m/s
+  var SD_PRECIP = 28;        // docs idx 27 "local precip accumulation (today)" · mm
+  var SD_PRECIP_FINAL = 29;  // docs idx 28 "… (final)" — rain-check corrected · mm
+
+  // Plausibility bounds, so an unexpected column layout yields null (an em-dash
+  // row that gets hidden) rather than a nonsense number on the wall display.
+  var LIM_TEMP_C = 90;       // |°C|
+  var LIM_GUST_MPS = 150;
+  var LIM_RAIN_MM = 2000;    // one day's accumulation
+
+  // Read one numeric cell defensively: array-like row, in range, finite.
+  function statNum(row, idx, min, max) {
+    if (!row || typeof row.length !== 'number' || idx >= row.length) { return null; }
+    var n = toNum(row[idx]);
+    if (n === null || n < min || n > max) { return null; }
+    return n;
+  }
+
+  // Fold stats_day into a compact records summary (metric; converted at render).
+  // Returns null when nothing usable was found.
+  function summarizeStats(d) {
+    var days = (d && d.stats_day) || [];
+    if (typeof days.length !== 'number' || !days.length) { return null; }
+
+    var today = localDateStr();
+    var ym = today.substring(0, 7);
+    var yr = today.substring(0, 4);
+    var rec = {
+      month: ym, year: yr,
+      rainMonthMm: null, rainYearMm: null,
+      hiMonthC: null, loMonthC: null,
+      gustMonthMps: null, gustYearMps: null
+    };
+    var any = false;
+
+    for (var i = 0; i < days.length; i++) {
+      var row = days[i];
+      if (!row || typeof row.length !== 'number' || row.length < 7) { continue; }
+      var date = row[SD_DATE];
+      if (typeof date !== 'string' || date.length < 10) { continue; }
+      if (date.substring(0, 4) !== yr) { continue; }
+      var inMonth = date.substring(0, 7) === ym;
+
+      // Prefer the rain-checked "final" accumulation; fall back to the raw daily.
+      var rain = statNum(row, SD_PRECIP_FINAL, 0, LIM_RAIN_MM);
+      if (rain === null) { rain = statNum(row, SD_PRECIP, 0, LIM_RAIN_MM); }
+      if (rain !== null) {
+        rec.rainYearMm = (rec.rainYearMm === null ? 0 : rec.rainYearMm) + rain;
+        if (inMonth) { rec.rainMonthMm = (rec.rainMonthMm === null ? 0 : rec.rainMonthMm) + rain; }
+        any = true;
+      }
+
+      var gust = statNum(row, SD_GUST, 0, LIM_GUST_MPS);
+      if (gust !== null) {
+        if (rec.gustYearMps === null || gust > rec.gustYearMps) { rec.gustYearMps = gust; }
+        if (inMonth && (rec.gustMonthMps === null || gust > rec.gustMonthMps)) { rec.gustMonthMps = gust; }
+        any = true;
+      }
+
+      if (inMonth) {
+        var hi = statNum(row, SD_TEMP_HI, -LIM_TEMP_C, LIM_TEMP_C);
+        var lo = statNum(row, SD_TEMP_LO, -LIM_TEMP_C, LIM_TEMP_C);
+        if (hi !== null && (rec.hiMonthC === null || hi > rec.hiMonthC)) { rec.hiMonthC = hi; any = true; }
+        if (lo !== null && (rec.loMonthC === null || lo < rec.loMonthC)) { rec.loMonthC = lo; any = true; }
+      }
+    }
+
+    return any ? rec : null;
+  }
+
+  function loadRecords() {
+    try {
+      var raw = localStorage.getItem(LAST_RECORDS_KEY);
+      if (!raw) { return null; }
+      return JSON.parse(raw);
+    } catch (e) { return null; }
+  }
+
+  // Show a row with formatted text, or hide it when the data isn't there.
+  function recRow(rowId, valId, text) {
+    var row = byId(rowId);
+    if (!row) { return false; }
+    if (!text) { row.style.display = 'none'; return false; }
+    var val = byId(valId);
+    if (val) { val.textContent = text; }  // formatted numbers only, never API strings
+    row.style.display = '';
+    return true;
+  }
+
+  function degText(c) {
+    return c === null ? '—' : (Math.round(cToF(c)) + '°');
+  }
+
+  function renderRecords(rec) {
+    if (!byId('tile-records')) { return; }
+    var shown = 0;
+
+    var rm = rec ? toNum(rec.rainMonthMm) : null;
+    var ry = rec ? toNum(rec.rainYearMm) : null;
+    if (recRow('rec-row-rainmonth', 'v-rec-rainmonth',
+      rm === null ? '' : mmToIn(rm).toFixed(2) + ' in')) { shown++; }
+    if (recRow('rec-row-rainyear', 'v-rec-rainyear',
+      ry === null ? '' : mmToIn(ry).toFixed(1) + ' in')) { shown++; }
+
+    var hi = rec ? toNum(rec.hiMonthC) : null;
+    var lo = rec ? toNum(rec.loMonthC) : null;
+    if (recRow('rec-row-temp', 'v-rec-temp',
+      (hi === null && lo === null) ? '' : (degText(hi) + ' / ' + degText(lo)))) { shown++; }
+
+    var gm = rec ? toNum(rec.gustMonthMps) : null;
+    var gy = rec ? toNum(rec.gustYearMps) : null;
+    var gustText = '';
+    if (gm !== null || gy !== null) {
+      gustText = (gm === null ? '—' : Math.round(mpsToMph(gm)) + '') + ' / ' +
+        (gy === null ? '—' : Math.round(mpsToMph(gy)) + '') + ' mph';
+    }
+    if (recRow('rec-row-gust', 'v-rec-gust', gustText)) { shown++; }
+
+    var empty = byId('v-rec-empty');
+    if (empty) { empty.style.display = shown ? 'none' : ''; }
   }
 
   /* ---------- rendering ---------- */
@@ -1761,6 +1900,13 @@
       if (xhr.readyState !== 4 || xhr.status !== 200) { return; }
       var d = null;
       try { d = JSON.parse(xhr.responseText); } catch (e) { return; }
+      // Month/year records ride along on the same payload — no extra call.
+      var rec = summarizeStats(d);
+      if (rec) {
+        saveLast(LAST_RECORDS_KEY, rec);
+        renderRecords(rec);
+      }
+
       var days = (d && d.stats_day) || [];
       var today = localDateStr();
       var row = null;
@@ -1768,7 +1914,7 @@
         if (days[i] && days[i][0] === today) { row = days[i]; break; }
       }
       if (!row) { return; }
-      var hiC = toNum(row[5]), loC = toNum(row[6]);
+      var hiC = toNum(row[SD_TEMP_HI]), loC = toNum(row[SD_TEMP_LO]);
       if (hiC === null && loC === null) { return; }
       todayHiLo = {
         date: today,
