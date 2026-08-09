@@ -188,6 +188,29 @@
           <div id="windrose" class="windrose"></div>
         </div>
 
+        <div class="tile" id="tile-records" data-mod="records">
+          <div class="tile-label">Records</div>
+          <div class="records">
+            <div class="records-row" id="rec-row-rainmonth" style="display:none">
+              <span class="records-lbl">Rain this month</span>
+              <span class="records-val" id="v-rec-rainmonth">&mdash;</span>
+            </div>
+            <div class="records-row" id="rec-row-rainyear" style="display:none">
+              <span class="records-lbl">Rain this year</span>
+              <span class="records-val" id="v-rec-rainyear">&mdash;</span>
+            </div>
+            <div class="records-row" id="rec-row-temp" style="display:none">
+              <span class="records-lbl">Month high / low</span>
+              <span class="records-val" id="v-rec-temp">&mdash;</span>
+            </div>
+            <div class="records-row" id="rec-row-gust" style="display:none">
+              <span class="records-lbl">Top gust mo / yr</span>
+              <span class="records-val" id="v-rec-gust">&mdash;</span>
+            </div>
+          </div>
+          <div class="tile-sub" id="v-rec-empty">Gathering station history&hellip;</div>
+        </div>
+
         <div class="tile tile-full" data-mod="daily">
           <div class="tile-label">Next days</div>
           <div id="daily-strip" class="fstrip"></div>
