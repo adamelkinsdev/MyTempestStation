@@ -18,7 +18,7 @@
   var LAST_AQI_KEY = 'tempest_last_aqi';       // cached Open-Meteo air-quality payload
   var LAST_ALERTS_KEY = 'tempest_last_alerts'; // cached NWS active-alerts payload
   var TODAY_HILO_KEY = 'tempest_today_hilo';   // server-side observed daily hi/lo
-  var DEVICE_KEY = 'tempest_device_id';        // Tempest sensor device_id (history backfill)
+  var DEVICE_KEY = 'tempest_device_id';        // Tempest sensor device_id (backfill + WebSocket)
   var LAST_RECORDS_KEY = 'tempest_records';    // month/year records mined from stats
   var STALE_MS = 15 * 60 * 1000; // flag data older than 15 min
 
@@ -40,9 +40,13 @@
 
   // Refresh cadence. Idle is the normal pace; Watch is a temporary fast pace for
   // storm-watching that auto-relaxes back to Idle after WATCH_DURATION_MS.
+  // While the Watch WebSocket is live the push feed replaces the fast poll, so we
+  // drop back to the idle interval as a safety net rather than a data source.
   var IDLE_REFRESH_MS = 60000;          // 60s normal
-  var WATCH_REFRESH_MS = 10000;         // 10s while watching
+  var WATCH_REFRESH_MS = 10000;         // 10s while watching (socket down)
   var WATCH_DURATION_MS = 5 * 60 * 1000; // watch mode lasts 5 minutes
+
+  var WS_URL = 'wss://ws.weatherflow.com/swd/data';
 
   var MODE_IDLE = 'idle';
   var MODE_WATCH = 'watch';
@@ -84,6 +88,14 @@
   var lastBackfillAt = 0;   // epoch ms of the last history-backfill attempt (throttle)
   var backfillBusy = false; // a backfill (or its device lookup) is in flight
   var todayHiLo = null;     // {date:'YYYY-MM-DD', hi, lo} observed hi/lo in °F
+  var stationDevice = null; // Tempest sensor device_id (cached, for the WebSocket)
+  var deviceLookupBusy = false; // one in-flight device_id discovery at a time
+  var ws = null;            // the Watch-mode WebSocket (at most one, ever)
+  var wsWanted = false;     // true only between enterWatch() and exitWatch()
+  var wsLive = false;       // socket open + subscribed: relaxes the Watch poll
+  var wsReqId = 0;          // request ids for the WebSocket control messages
+  var liveGustMph = null;   // last full-observation gust/lull, so a rapid-wind
+  var liveLullMph = null;   // repaint keeps the wind bar's other markers
 
   // Alert glows on for genuinely unhealthy air (US AQI above "Unhealthy for
   // Sensitive Groups").
@@ -148,17 +160,9 @@
   }
 
   // The Tempest sensor's device_id, discovered once from the station metadata and
-  // cached per-device like the coords/place above. Only the history backfill needs
-  // it — everything else on the dashboard is station-level.
-  function loadDeviceId() {
-    try {
-      var raw = localStorage.getItem(DEVICE_KEY);
-      if (!raw) { return null; }
-      return toNum(raw);
-    } catch (e) {}
-    return null;
-  }
-
+  // cached per-device like the coords/place above (loadDeviceId lives with the
+  // discovery code, next to fetchDeviceId). The history backfill and the Watch
+  // WebSocket share it — everything else on the dashboard is station-level.
   function saveDeviceId(id) {
     try { localStorage.setItem(DEVICE_KEY, String(id)); } catch (e) {}
   }
@@ -481,6 +485,32 @@
     if (!g || !g.setAttribute) { return; }
     var d = (deg === null) ? 0 : deg;
     g.setAttribute('transform', 'rotate(' + d + ' 50 50)');
+  }
+
+  // Live wind from a WebSocket rapid_wind push (~every 3s). This is a partial,
+  // transient reading: it repaints the wind value, bar and compass only — it is
+  // never written to the history ring buffer or the last-observation cache, so a
+  // reload or the next full obs replaces it with real data. Gust/lull markers
+  // keep their last full-observation positions.
+  function renderRapidWind(speedMps, dirDeg) {
+    var mps = toNum(speedMps);
+    var deg = toNum(dirDeg);
+
+    var vw = byId('v-wind');
+    if (vw) { vw.innerHTML = fmt(mps, mpsToMph, 1, ' mph'); }
+
+    var vd = byId('v-winddir');
+    if (vd) {
+      var card = cardinal(deg);
+      var degTxt = (deg === null) ? '' : (' ' + Math.round(deg) + '&deg;');
+      vd.innerHTML = card ? (card + degTxt) : (degTxt || '&mdash;');
+    }
+
+    var mph = (mps === null) ? null : mpsToMph(mps);
+    // A rapid gust above the last reported gust is real — let the marker lead.
+    var gust = (mph !== null && (liveGustMph === null || mph > liveGustMph)) ? mph : liveGustMph;
+    renderWindBar(mph, gust, liveLullMph);
+    renderCompass(deg);
   }
 
   /* ---------- Lightning proximity ---------- */
@@ -1516,7 +1546,9 @@
       '' : (' ' + Math.round(Number(o.wind_direction)) + '&deg;');
     byId('v-winddir').innerHTML = card ? (card + deg) : (deg || '&mdash;');
 
-    renderWindBar(mpsToMphN(o.wind_avg), mpsToMphN(o.wind_gust), mpsToMphN(o.wind_lull));
+    liveGustMph = mpsToMphN(o.wind_gust);
+    liveLullMph = mpsToMphN(o.wind_lull);
+    renderWindBar(mpsToMphN(o.wind_avg), liveGustMph, liveLullMph);
     renderCompass(toNum(o.wind_direction));
 
     // Prefer sea-level pressure; fall back to station/barometric pressure.
@@ -1598,6 +1630,78 @@
       setError('The request timed out. Pull to refresh or tap Refresh.');
     };
 
+    xhr.send();
+  }
+
+  /* ---------- device_id discovery (for the Watch WebSocket) ---------- */
+  // The WebSocket subscribes by device, not station, so Watch mode needs the
+  // Tempest sensor's device_id. Cached per-device like the coords/place lookups
+  // (hardware doesn't change), and entirely best-effort: without it Watch mode
+  // just polls REST the way it always did.
+
+  function loadDeviceId() {
+    try {
+      var raw = localStorage.getItem(DEVICE_KEY);
+      var n = toNum(raw);
+      return (n === null || n <= 0) ? null : n;
+    } catch (e) { return null; }
+  }
+
+  function buildStationMetaUrl(token, station) {
+    return 'https://swd.weatherflow.com/swd/rest/stations/' + encodeURIComponent(station) +
+      '?token=' + encodeURIComponent(token);
+  }
+
+  // The Tempest sensor is the device whose device_type is "ST" or whose serial
+  // starts "ST-" (the others are the hub, "HB-", and legacy AIR/SKY units).
+  function pickTempestDevice(data) {
+    var stations = (data && data.stations) || [];
+    for (var i = 0; i < stations.length; i++) {
+      var devices = stations[i].devices || [];
+      for (var j = 0; j < devices.length; j++) {
+        var d = devices[j] || {};
+        var type = d.device_type ? String(d.device_type) : '';
+        var serial = d.serial_number ? String(d.serial_number) : '';
+        if (type === 'ST' || serial.indexOf('ST-') === 0) {
+          var id = toNum(d.device_id);
+          if (id !== null) { return id; }
+        }
+      }
+    }
+    return null;
+  }
+
+  // cb(deviceId) runs once, with null when discovery failed.
+  function fetchDeviceId(cb) {
+    var token = getToken();
+    var station = getStation();
+    if (!token || !station || deviceLookupBusy) { cb(null); return; }
+    deviceLookupBusy = true;
+
+    // A timeout can also surface as readyState 4 / status 0, so fire cb once.
+    var done = false;
+    function finish(id) {
+      if (done) { return; }
+      done = true;
+      deviceLookupBusy = false;
+      cb(id);
+    }
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', buildStationMetaUrl(token, station), true);
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) { return; }
+      if (xhr.status !== 200) { finish(null); return; }
+      var data = null;
+      try { data = JSON.parse(xhr.responseText); } catch (e) { finish(null); return; }
+      var id = pickTempestDevice(data);
+      if (id === null) { finish(null); return; }
+      stationDevice = id;
+      saveDeviceId(id);
+      finish(id);
+    };
+    xhr.ontimeout = function () { finish(null); };
     xhr.send();
   }
 
@@ -1940,60 +2044,17 @@
   // for hours. The device-level observations endpoint serves the same readings we
   // poll, but historically, so we seed the buffer once from it.
   //
-  // Station-level endpoints don't expose a device_id, so this needs a one-time
-  // metadata lookup first (cached like the coords/place). Everything here is
-  // best-effort: any failure leaves the buffer exactly as it was.
-
-  function buildStationMetaUrl(token, station) {
-    return 'https://swd.weatherflow.com/swd/rest/stations/' + encodeURIComponent(station) +
-      '?token=' + encodeURIComponent(token);
-  }
+  // Station-level endpoints don't expose a device_id, so this shares the
+  // one-time metadata lookup with the Watch WebSocket (fetchDeviceId, above).
+  // Everything here is best-effort: fetchDeviceId reports failure as cb(null),
+  // which fetchHistoryBackfill turns into a cleared busy flag, leaving the
+  // buffer exactly as it was.
 
   function buildDeviceObsUrl(token, deviceId, start, end) {
     return 'https://swd.weatherflow.com/swd/rest/observations/?device_id=' +
       encodeURIComponent(deviceId) +
       '&time_start=' + start + '&time_end=' + end +
       '&token=' + encodeURIComponent(token);
-  }
-
-  // A station lists every device attached to it: the Tempest sensor ("ST" /
-  // serial "ST-…"), the hub ("HB-"), and any legacy AIR/SKY units ("AR-"/"SK-").
-  // Only the Tempest reports the obs we mirror, so match on it and skip the rest.
-  function pickTempestDevice(data) {
-    var stations = (data && data.stations) || [];
-    for (var i = 0; i < stations.length; i++) {
-      var devs = stations[i].devices || [];
-      for (var j = 0; j < devs.length; j++) {
-        var d = devs[j] || {};
-        var type = d.device_type ? String(d.device_type) : '';
-        var serial = d.serial_number ? String(d.serial_number) : '';
-        if (type === 'ST' || serial.indexOf('ST-') === 0) {
-          var id = toNum(d.device_id);
-          if (id !== null) { return id; }
-        }
-      }
-    }
-    return null;
-  }
-
-  function fetchDeviceId(cb) {
-    var token = getToken();
-    var station = getStation();
-    if (!token || !station) { backfillBusy = false; return; }
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', buildStationMetaUrl(token, station), true);
-    xhr.timeout = 15000;
-    xhr.onreadystatechange = function () {
-      if (xhr.readyState !== 4) { return; }
-      if (xhr.status !== 200) { backfillBusy = false; return; }
-      var d = null;
-      try { d = JSON.parse(xhr.responseText); } catch (e) { backfillBusy = false; return; }
-      var id = pickTempestDevice(d);
-      if (id === null) { backfillBusy = false; return; }
-      saveDeviceId(id);
-      cb(id);
-    };
-    xhr.send();
   }
 
   // Device observations are positional arrays (the obs_st layout, see
@@ -2085,6 +2146,141 @@
     fetchForecast();
   }
 
+  /* ---------- Watch-mode WebSocket (Tempest real-time push) ---------- */
+  // Observations only change once a minute, so polling every 10s mostly burns
+  // requests. Instead, Watch mode opens the Tempest WebSocket and reacts to
+  // pushes: rapid_wind (~3s) moves the compass/wind readout, obs_st/evt_* just
+  // trigger the normal fetchData() so there is one render path, not two.
+  //
+  // The socket is open ONLY while Watch mode is active. That keeps it to one
+  // connection, and sidesteps the documented 10-minute idle disconnect (Watch
+  // itself lasts 5). WebSocket exists on iOS 10.3, but we feature-detect anyway
+  // and fall back to the old 10s poll whenever the socket is unavailable, errors
+  // or closes.
+
+  function wsSupported() {
+    return typeof WebSocket !== 'undefined';
+  }
+
+  function buildWsUrl(token) {
+    return WS_URL + '?token=' + encodeURIComponent(token);
+  }
+
+  function wsSend(sock, msg) {
+    if (!sock) { return; }
+    try { sock.send(JSON.stringify(msg)); } catch (e) {}
+  }
+
+  function nextWsId() {
+    wsReqId += 1;
+    return 'mts-' + wsReqId;
+  }
+
+  // Socket went live or died: the Watch poll interval depends on it.
+  function setWsLive(live) {
+    if (wsLive === live) { return; }
+    wsLive = live;
+    if (mode === MODE_WATCH) { restartRefreshTimer(); }
+  }
+
+  function handleWsMessage(raw) {
+    var msg = null;
+    try { msg = JSON.parse(raw); } catch (e) { return; }
+    if (!msg || !msg.type) { return; }
+
+    if (msg.type === 'rapid_wind') {
+      // ob = [epoch, wind_speed_mps, wind_direction_deg]
+      var ob = msg.ob;
+      if (ob && ob.length >= 3) { renderRapidWind(ob[1], ob[2]); }
+      return;
+    }
+
+    if (msg.type === 'obs_st') {
+      // A full observation landed. Rather than hand-map the positional array,
+      // pull the station observation and reuse the whole normal render path.
+      fetchData();
+      return;
+    }
+
+    if (msg.type === 'evt_strike') {
+      // Glow the lightning tile at once; the values catch up on the refetch.
+      setAlert('tile-lightning', true);
+      // Lightning is exactly when you want to keep watching — restart the clock.
+      watchEndsAt = new Date().getTime() + WATCH_DURATION_MS;
+      updateWatchButton();
+      fetchData();
+      return;
+    }
+
+    if (msg.type === 'evt_precip') {
+      fetchData();
+    }
+    // Everything else (ack, connection_opened, legacy obs types) is ignored.
+  }
+
+  function subscribeWs(sock, deviceId) {
+    // Two subscriptions: observations/events, and the ~3s rapid wind feed.
+    wsSend(sock, { type: 'listen_start', device_id: deviceId, id: nextWsId() });
+    wsSend(sock, { type: 'listen_rapid_start', device_id: deviceId, id: nextWsId() });
+  }
+
+  function unsubscribeWs(sock, deviceId) {
+    wsSend(sock, { type: 'listen_stop', device_id: deviceId, id: nextWsId() });
+    wsSend(sock, { type: 'listen_rapid_stop', device_id: deviceId, id: nextWsId() });
+  }
+
+  function openWatchSocket(deviceId) {
+    // Guard against a second connection: one per client, per the API rules.
+    if (ws || !wsWanted || !wsSupported()) { return; }
+    var token = getToken();
+    if (!token || !deviceId) { return; }
+
+    var sock = null;
+    try { sock = new WebSocket(buildWsUrl(token)); }
+    catch (e) { return; }
+    ws = sock;
+
+    sock.onopen = function () {
+      // exitWatch() may have run while the socket was connecting.
+      if (!wsWanted || ws !== sock) { closeWatchSocket(); return; }
+      subscribeWs(sock, deviceId);
+      setWsLive(true);
+    };
+    sock.onmessage = function (ev) {
+      if (ws !== sock) { return; }
+      handleWsMessage(ev.data);
+    };
+    sock.onerror = function () { setWsLive(false); };
+    sock.onclose = function () {
+      // Never resurrect: the socket only exists for the life of Watch mode.
+      if (ws === sock) { ws = null; }
+      setWsLive(false);
+    };
+  }
+
+  function closeWatchSocket() {
+    var sock = ws;
+    ws = null;
+    setWsLive(false);
+    if (!sock) { return; }
+    // Unsubscribe first if we're still connected; a send on a closing socket
+    // just throws and is swallowed.
+    if (stationDevice) { unsubscribeWs(sock, stationDevice); }
+    try { sock.close(); } catch (e) {}
+  }
+
+  // Called by enterWatch(): find the device id (cached after the first time),
+  // then connect. Silent on failure — Watch mode simply polls as before.
+  function startWatchSocket() {
+    if (!wsSupported()) { return; }
+    if (stationDevice) { openWatchSocket(stationDevice); return; }
+    stationDevice = loadDeviceId();
+    if (stationDevice) { openWatchSocket(stationDevice); return; }
+    fetchDeviceId(function (id) {
+      if (id && wsWanted) { openWatchSocket(id); }
+    });
+  }
+
   /* ---------- auto refresh + watch mode ---------- */
 
   // Each periodic tick: while watching we pull observations only (the forecast
@@ -2094,9 +2290,12 @@
     else { refreshAll(); }
   }
 
+  // While the Watch socket is live, pushes carry the data — the poll relaxes to
+  // the idle cadence as a safety net. No socket (or it errored/closed) and Watch
+  // polls fast, exactly as it did before.
   function restartRefreshTimer() {
     if (refreshTimer) { clearInterval(refreshTimer); }
-    var interval = (mode === MODE_WATCH) ? WATCH_REFRESH_MS : IDLE_REFRESH_MS;
+    var interval = (mode === MODE_WATCH && !wsLive) ? WATCH_REFRESH_MS : IDLE_REFRESH_MS;
     refreshTimer = setInterval(refreshTick, interval);
   }
 
@@ -2109,6 +2308,8 @@
   function stopAutoRefresh() {
     if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
     stopWatchCountdown();
+    wsWanted = false;
+    closeWatchSocket();
     mode = MODE_IDLE;
     updateWatchButton();
   }
@@ -2143,6 +2344,8 @@
   function enterWatch() {
     mode = MODE_WATCH;
     watchEndsAt = new Date().getTime() + WATCH_DURATION_MS;
+    wsWanted = true;
+    startWatchSocket(); // best-effort; the fast poll covers us until it's live
     restartRefreshTimer();
     startWatchCountdown();
     updateWatchButton();
@@ -2151,6 +2354,8 @@
 
   function exitWatch() {
     mode = MODE_IDLE;
+    wsWanted = false;
+    closeWatchSocket();
     stopWatchCountdown();
     restartRefreshTimer();
     updateWatchButton();
